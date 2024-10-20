@@ -1,0 +1,15 @@
+{
+    "configurations": [
+        {
+            "name": "Run.py with MNIST",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/run.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--experiment_type=mnist",
+                "--use_cuda=false"
+            ]
+        }
+    ]
+}
