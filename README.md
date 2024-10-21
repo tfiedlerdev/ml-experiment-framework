@@ -4,7 +4,7 @@ This framework attempts to streamline the machine learning research process to e
 - a single source of truth for the definition of which arguments are allowed for which dataset, ML-model etc. 
 - IntelliSense for available arguments for a specific experiment including type validation through Pydantic
 - code reusability (metrics tracking, training loop, checkpoint loading, wandb logging, early stopping, ... are available per default for all experiments)
-- collaboration through a proper software architecture instead of copy paste experimenting
+- collaboration through a proper software architecture instead of copy paste experimenting while still allowing for quick "out of framework" scripting, optionally reusing Dataset and Deep Learning Model modules
 - zero effort logging and history plotting
 
 The assumptions to achieve this are that all experiment share some basic logic. 
