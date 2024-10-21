@@ -25,7 +25,7 @@ class BaseExperimentArgs(PDBaseModel):
         default=16, description="Batch size for training and validation"
     )
     epochs: int = 10
-    experiment_name: str = "experiment_1"
+    wandb_experiment_name: str = "experiment_1"
     experiment_id: Literal["mnist"] = Field(
         description="Type identifier of experiment to run. Experiment is selected from experiment_registry"
     )
@@ -129,7 +129,7 @@ class BaseExperiment(metaclass=ABCMeta):
             project=self.yaml_config.wandb_project_name,
             entity=self.yaml_config.wandb_entity,
             config=self.raw_config,
-            name=self.base_config.experiment_name,
+            name=self.base_config.wandb_experiment_name,
             dir=self.yaml_config.cache_dir,
             save_code=True,
             mode="online" if self.base_config.use_wandb else "disabled",
