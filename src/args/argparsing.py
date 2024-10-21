@@ -1,5 +1,5 @@
 import argparse
-from typing import Any, Literal, Type, cast
+from typing import Literal, Type
 from pydantic import BaseModel
 from src.args.yaml_config import YamlConfig
 from src.experiments.base_experiment import BaseExperiment, BaseExperimentArgs
@@ -31,25 +31,33 @@ def _parser_from_model(parser: argparse.ArgumentParser, model: Type[BaseModel]):
     fields = model.model_fields
 
     for name, field in fields.items():
-        if name == "hidden_sizes":
-            pass
 
         def get_type_args():
-            is_literal = getattr(field.annotation, "__origin__", None) is Literal
-            is_bool = getattr(field.annotation, "__name__", None) == "bool"
-            annotation_origin = getattr(field.annotation, "__origin__", None)
-            is_list = (
-                annotation_origin is not None
-                and getattr(annotation_origin, "__name__", None) == "list"
+            is_optional = getattr(field.annotation, "__name__", None) == "Optional"
+
+            anno_args = getattr(field.annotation, "__args__", None)
+            field_type = (
+                anno_args[0]
+                if anno_args is not None and is_optional
+                else field.annotation
             )
+            assert field_type is not None
+            field_type_name = getattr(field_type, "__name__", None)
+            is_literal = (
+                field_type_name == "Literal"
+                if is_optional
+                else getattr(field.annotation, "__origin__", None) is Literal
+            )
+            is_bool = field_type_name == "bool"
+            is_list = field_type_name == "list"
 
             if is_literal:
-                return {"type": str, "choices": cast(Any, field.annotation).__args__}
+                return {"type": str, "choices": field_type.__args__}
             if is_bool:
                 return {"type": str_to_bool}
             if is_list:
                 return {"type": str_to_list}
-            return {"type": field.annotation}
+            return {"type": field_type}
 
         parser.add_argument(
             f"--{name}",
