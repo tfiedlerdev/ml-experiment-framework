@@ -1,5 +1,5 @@
-cache_dir: cache
+cache_dir: /home/mr-robot/Workspaces/ml-experiment-framework/cache
 wandb_api_key: None
 wandb_project_name: None
 wandb_entity: None
-results_dir: results
+results_dir: /home/mr-robot/Workspaces/ml-experiment-framework/results

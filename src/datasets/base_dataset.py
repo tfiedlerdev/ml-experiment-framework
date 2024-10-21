@@ -54,3 +54,7 @@ class BaseDataset(Dataset):
             return Batch(inputs, targets)
 
         return collate
+
+    @abstractmethod
+    def __len__(self) -> int:
+        pass

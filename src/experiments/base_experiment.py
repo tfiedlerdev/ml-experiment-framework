@@ -21,7 +21,9 @@ from src.train.history import SingleEpochHistory, TrainHistory
 
 
 class BaseExperimentArgs(PDBaseModel):
-    batch_size: int = Field(16, description="Batch size for training and validation")
+    batch_size: int = Field(
+        default=16, description="Batch size for training and validation"
+    )
     epochs: int = 10
     experiment_name: str = "experiment_1"
     experiment_type: Literal["mnist"] = Field(
@@ -30,31 +32,31 @@ class BaseExperimentArgs(PDBaseModel):
     log_every_n_batches: int = 10
     return_best_model: bool = True
     best_model_metric: str = Field(
-        "loss",
+        default="loss",
         description='The metric by which to measure the models performance. Can be "loss" for using the applied loss or any metric that is returned by the model',
     )
     minimize_best_model_metric: bool = Field(
-        True,
+        default=True,
         description="Specify if best_model_metric should be minimized or maximized",
     )
     use_wandb: bool = False
     from_checkpoint: Optional[str] = Field(
-        None, description="(optional) Path to model checkpoint"
+        default=None, description="(optional) Path to model checkpoint"
     )
-    only_test: bool = Field(False, description="Only run test, skip training")
+    only_test: bool = Field(default=False, description="Only run test, skip training")
     predict_on_train: bool = Field(
-        False, description="Run prediction on train set after model training"
+        default=False, description="Run prediction on train set after model training"
     )
     gradient_clipping: Optional[float] = None
     whiteNoiseSD: float = 0.0
     constantOffsetSD: float = 0.0
     seed: int = 42
     early_stopping_patience: Optional[int] = Field(
-        None,
+        default=None,
         description="Number of epochs n to consider for early stopping. Once all n-1 last epochs did not improve compared to the -nth epoch, training is stopped.   If None, early stopping is disabled",
     )
     early_stopping_delta: float = Field(
-        0.0001,
+        default=0.0001,
         description="Minimum delta of to be optimized metric that is considered as an improvement for early stopping",
     )
     results_subdir_name: Optional[str] = None

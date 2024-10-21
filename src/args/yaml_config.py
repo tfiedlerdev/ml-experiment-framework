@@ -2,6 +2,7 @@ import os
 
 import yaml
 from pydantic import BaseModel, Field
+import sys
 
 default_value = "<your value here>"
 
@@ -33,7 +34,7 @@ class YamlConfig:
                     f.write(
                         f"{name}: {field.default if field.default is not None else default_value}\n"
                     )
-                exit(0)
+                sys.exit(0)
         with open(self.config_path, "r") as f:
             file_content = yaml.safe_load(f)
             try:
