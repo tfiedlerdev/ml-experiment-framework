@@ -7,7 +7,7 @@
             "program": "${workspaceFolder}/run.py",
             "console": "integratedTerminal",
             "args": [
-                "--experiment_type=mnist",
+                "--experiment_id=mnist",
                 "--use_cuda=false"
             ]
         }

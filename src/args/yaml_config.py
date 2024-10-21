@@ -9,14 +9,17 @@ default_value = "<your value here>"
 
 class YamlConfigModel(BaseModel):
     cache_dir: str = Field(
-        description="Directory to store larger temporary files like model checkpoints in"
+        default="cache",
+        description="Directory to store larger temporary files like model checkpoints in",
     )
     wandb_api_key: str = Field(
         description="Your Weights and Biases API key. You can find it in your W&B account settings."
     )
     wandb_project_name: str = Field(description="Your W&B project name.")
     wandb_entity: str = Field(description="Your W&B entity name.")
-    results_dir: str = Field(description="Output directory for experiment results")
+    results_dir: str = Field(
+        default="results", description="Output directory for experiment results"
+    )
 
 
 class YamlConfig:

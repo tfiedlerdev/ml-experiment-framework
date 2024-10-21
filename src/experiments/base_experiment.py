@@ -26,7 +26,7 @@ class BaseExperimentArgs(PDBaseModel):
     )
     epochs: int = 10
     experiment_name: str = "experiment_1"
-    experiment_type: Literal["mnist"] = Field(
+    experiment_id: Literal["mnist"] = Field(
         description="Type identifier of experiment to run. Experiment is selected from experiment_registry"
     )
     log_every_n_batches: int = 10

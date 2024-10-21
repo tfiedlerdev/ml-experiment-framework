@@ -66,7 +66,7 @@ def _create_arg_parser():
     base_parser = _parser_from_model(base_parser, BaseExperimentArgs)
     base_args, _ = base_parser.parse_known_args()
 
-    experiment_model = experiments[base_args.experiment_type].get_args_model()
+    experiment_model = experiments[base_args.experiment_id].get_args_model()
     parser = argparse.ArgumentParser(
         description="Machine Learning Experiment Configuration"
     )
@@ -79,5 +79,5 @@ def get_experiment_from_args() -> BaseExperiment:
     args = arg_parser.parse_args()
     yaml_config = YamlConfig()
 
-    experiment = experiments[args.experiment_type](vars(args), yaml_config.config)
+    experiment = experiments[args.experiment_id](vars(args), yaml_config.config)
     return experiment
