@@ -24,7 +24,8 @@ For demonstration purposes, an experiment for MNIST (handwritten digit classific
 1. Fork this repository
 2. Create conda environment from `environment.yaml`: `conda env create --file environment.yaml`
 3. Run MNIST experiment via e.g.`python run.py --experiment_id=mnist --use_cuda=false --hidden_sizes="[64]"`, you'll be prompted to fill out a config YAML to specify directories for cache files and the experiment results. Per default, they will be put in `cache` and `results` directories within the working directory. If you want to keep it that way, just jump to step 4 . Within the config.yaml there will also be WandB attributes which you do not have to change unless you're running experiments with `--use_wandb=true`
-4. Run the command again, training should run and you should see the experiment results in the specified folder: results are automatically grouped by experiment and you can optionally specify a subdir via `--results_subdir_name=[NAME]`:![image](https://github.com/user-attachments/assets/b2b9a8ca-320a-4d9c-9717-8af80ad6af4b)
+4. Run the command again, training should run and you should see the experiment results in the specified folder: results are automatically grouped by experiment and you can optionally specify a subdir via `--results_subdir_name=[NAME]`:
+![image](https://github.com/user-attachments/assets/b2b9a8ca-320a-4d9c-9717-8af80ad6af4b)
 
 example history.png: ![image](https://github.com/user-attachments/assets/a0fedc78-c960-4a7e-a9bf-2878e947e336)
 
