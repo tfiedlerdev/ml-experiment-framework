@@ -73,7 +73,9 @@ def _create_arg_parser():
     base_parser = argparse.ArgumentParser()
     base_parser = _parser_from_model(base_parser, BaseExperimentArgs)
     base_args, _ = base_parser.parse_known_args()
-
+    assert (
+        base_args.experiment_id in experiments
+    ), f"{base_args.experiment_id} not found in experiment registry"
     experiment_model = experiments[base_args.experiment_id].get_args_model()
     parser = argparse.ArgumentParser(
         description="Machine Learning Experiment Configuration"

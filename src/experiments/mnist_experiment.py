@@ -16,16 +16,13 @@ from src.datasets.mnist_dataset import MnistDataset, MnistDatasetArgs
 class MnistExperimentArgs(
     BaseExperimentArgs, AdamArgs, StepLRArgs, MnistFcModelArgs, MnistDatasetArgs
 ):
-    pass
+    do_different: bool = False
 
 
 class MnistExperiment(BaseExperiment):
     def __init__(self, config: dict[str, Any], yaml_config: YamlConfigModel):
         self.config = MnistExperimentArgs(**config)
-        self.mnist_data = MNIST(
-            os.path.join(yaml_config.cache_dir, "mnist"),
-            download=True,
-        )
+        self.mnist_data = MnistDataset(self.config, yaml_config)
         super().__init__(config, yaml_config)
 
     def get_name(self) -> str:
@@ -34,7 +31,7 @@ class MnistExperiment(BaseExperiment):
     def _create_dataset(
         self, split: Literal["train", "val", "test"] = "train"
     ) -> BaseDataset:
-        return MnistDataset(self.mnist_data, self.config, self.yaml_config, split)
+        return self.mnist_data.get_split(split)
 
     def _create_model(self) -> BaseModel:
         return MnistFcModel(self.config)

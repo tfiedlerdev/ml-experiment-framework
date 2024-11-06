@@ -19,9 +19,9 @@ class Trainer:
         self.config = experiment.base_config
         self.yaml_config = experiment.yaml_config
 
-        self.dataloader_train = experiment.dataloader_train
-        self.dataloader_val = experiment.dataloader_val
-        self.dataloader_test = experiment.dataloader_test
+        self.dataloader_train = experiment._create_dataloader("train")
+        self.dataloader_val = experiment._create_dataloader("val")
+        self.dataloader_test = experiment._create_dataloader("test")
 
         self.model = experiment.model
         self.device = experiment.get_device()

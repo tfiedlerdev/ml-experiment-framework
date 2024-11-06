@@ -1,5 +1,6 @@
 from abc import abstractmethod
-from typing import Any, Callable, NamedTuple, Optional
+from typing import Any, Callable, NamedTuple, Optional, Literal
+from typing_extensions import Self
 
 import torch
 from torch.utils.data import Dataset
@@ -57,4 +58,8 @@ class BaseDataset(Dataset):
 
     @abstractmethod
     def __len__(self) -> int:
+        pass
+
+    @abstractmethod
+    def get_split(self, split: Literal["train", "val", "test"]) -> Self:
         pass

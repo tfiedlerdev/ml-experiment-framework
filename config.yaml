@@ -1,5 +1,0 @@
-cache_dir: cache
-wandb_api_key: PydanticUndefined
-wandb_project_name: PydanticUndefined
-wandb_entity: PydanticUndefined
-results_dir: results

@@ -26,7 +26,7 @@ class BaseExperimentArgs(PDBaseModel):
     )
     epochs: int = 10
     wandb_experiment_name: str = "experiment_1"
-    experiment_id: Literal["mnist"] = Field(
+    experiment_id: str = Field(
         description="Type identifier of experiment to run. Experiment is selected from experiment_registry"
     )
     log_every_n_batches: int = 10
@@ -69,10 +69,6 @@ class BaseExperiment(metaclass=ABCMeta):
         torch.manual_seed(self.base_config.seed)
         np.random.seed(self.base_config.seed)
         self.yaml_config = yaml_config
-
-        self.dataloader_train = self._create_dataloader(split="train")
-        self.dataloader_val = self._create_dataloader(split="val")
-        self.dataloader_test = self._create_dataloader(split="test")
 
         self.raw_config = config
 
