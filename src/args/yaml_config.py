@@ -20,6 +20,7 @@ class YamlConfigModel(BaseModel):
     results_dir: str = Field(
         default="results", description="Output directory for experiment results"
     )
+    retina_dset_path: str = Field(description="The path to retina dataset")
 
 
 class YamlConfig:
