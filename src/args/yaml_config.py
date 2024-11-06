@@ -20,6 +20,10 @@ class YamlConfigModel(BaseModel):
     results_dir: str = Field(
         default="results", description="Output directory for experiment results"
     )
+    ukbiobank_data_dir: str = Field(
+        default="/dhc/projects/ukbiobank/derived/imaging/retinal_fundus/images_resized_224",
+        description="Directory where UK Biobank data is stored",
+    )
 
 
 class YamlConfig:
