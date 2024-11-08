@@ -30,12 +30,10 @@ class RetinaFileReference:
     gt_path: str
     split: str
 
-
 @dataclass
 class RetinaBatch(Batch):
     original_size: torch.Tensor
     image_size: torch.Tensor
-
 
 def get_polyp_transform():
     transform_train = transforms.Compose(
@@ -43,7 +41,7 @@ def get_polyp_transform():
             # transforms.Resize((352, 352)),
             transforms.ToPILImage(),
             transforms.ColorJitter(
-                brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1  # type: ignore
+                brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1
             ),
             transforms.RandomVerticalFlip(),
             transforms.RandomHorizontalFlip(),
@@ -95,7 +93,7 @@ class RetinaDataset(BaseDataset):
         image = self.cv2_loader(sample.img_path, is_mask=False)
         gt = self.cv2_loader(sample.gt_path, is_mask=True)
 
-        img, mask = augmentations(image, gt)
+        img, mask = augmentations(image,gt)
 
         original_size = tuple(img.shape[1:3])
         img, mask = self.sam_trans.apply_image_torch(
@@ -105,6 +103,7 @@ class RetinaDataset(BaseDataset):
         mask[mask <= 0.5] = 0
         image_size = tuple(img.shape[1:3])
 
+        
         return RetinaSample(
             input=self.sam_trans.preprocess(img),
             target=self.sam_trans.preprocess(mask),
@@ -115,18 +114,17 @@ class RetinaDataset(BaseDataset):
 
     def __len__(self):
         return len(self.samples)
-
-    def get_collate_fn(self):  # type: ignore
+    
+    def get_collate_fn(self): # type: ignore
         def collate(samples: list[RetinaSample]):
             inputs = torch.stack([s.input for s in samples])
             targets = torch.stack([s.target for s in samples])
             original_size = torch.stack([s.original_size for s in samples])
             image_size = torch.stack([s.image_size for s in samples])
-            return RetinaBatch(
-                inputs, targets, original_size=original_size, image_size=image_size
-            )
+            return RetinaBatch(inputs, targets, original_size=original_size, image_size=image_size)
 
         return collate
+
 
     def get_split(self, split: Literal["train", "val", "test"]) -> Self:
 

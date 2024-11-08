@@ -33,7 +33,7 @@ class Trainer:
         loss = evaluator.get_latest_loss()
         running = evaluator.get_running_loss()
         print(
-            f"Batch {batch + 1}/{n_batches} {self.loss_name}_loss: {loss:.2f} running: {running:.2f}\r",
+            f"Batch {batch + 1}/{n_batches} loss: {loss:.2f} running: {running:.2f}\r",
             end="",
         )
 
@@ -47,22 +47,22 @@ class Trainer:
             self.optimizer.zero_grad()
 
             if self.config.whiteNoiseSD > 0:
-                input = batch.input
+                input, _ = batch
                 noised_input = input + (
                     torch.randn(input.shape, device=input.device)
                     * self.config.whiteNoiseSD
                 )
-                batch.input = noised_input
+                batch._replace(input=noised_input)
 
             if self.config.constantOffsetSD > 0:
-                input = batch.input
+                input, _ = batch
                 offset_input = input + (
                     torch.randn(
                         [input.shape[0], 1, input.shape[2]], device=input.device
                     )
                     * self.config.constantOffsetSD
                 )
-                batch.input = offset_input
+                batch._replace(input=offset_input)
 
             # Make predictions for this batch
             with torch.enable_grad():
