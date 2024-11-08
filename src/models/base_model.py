@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Generic, TypeVar
 
 import torch
 from torch.nn import Module
@@ -19,11 +19,14 @@ class Loss:
     metrics: Optional[dict[str, float]]
 
 
-class BaseModel(Module, ABC):
+B = TypeVar("B", bound=Batch)
+
+
+class BaseModel(Module, ABC, Generic[B]):
     @abstractmethod
-    def forward(self, batch: Batch) -> ModelOutput:
+    def forward(self, batch: B) -> ModelOutput:
         pass
 
     @abstractmethod
-    def compute_loss(self, outputs: ModelOutput, batch: Batch) -> Loss:
+    def compute_loss(self, outputs: ModelOutput, batch: B) -> Loss:
         pass
