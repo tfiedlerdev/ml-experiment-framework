@@ -10,6 +10,21 @@
                 "--experiment_id=mnist",
                 "--use_cuda=false"
             ]
+        },
+        {
+            "name": "Run.py with retina",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/run.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--experiment_id=retina",
+                "--sam_model=vit_b",
+                "--target=cup",
+                "--learning_rate=0.0003",
+                "--batch_size=3",
+                "--epochs=5"
+            ]
         }
     ]
 }

@@ -14,14 +14,14 @@ from src.schedulers.step_lr import StepLRArgs, create_steplr_scheduler
 class RetinaExperimentArgs(
     BaseExperimentArgs, AdamArgs, StepLRArgs, RetinaDatasetArgs, AutoSamModelArgs
 ):
-    
+
     pass
 
 
 class RetinaExperiment(BaseExperiment):
     def __init__(self, config: dict[str, Any], yaml_config: YamlConfigModel):
         self.config = RetinaExperimentArgs(**config)
-        self.retina_data = RetinaDataset(config=self.config,yaml_config= yaml_config)
+        self.retina_data = RetinaDataset(config=self.config, yaml_config=yaml_config)
         super().__init__(config, yaml_config)
 
     def get_name(self) -> str:
@@ -48,4 +48,4 @@ class RetinaExperiment(BaseExperiment):
         return create_steplr_scheduler(optimizer, self.config)
 
     def get_loss_name(self) -> str:
-        return "cross_entropy"
+        return "dice+bce"

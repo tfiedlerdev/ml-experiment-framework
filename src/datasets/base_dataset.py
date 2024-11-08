@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Any, Callable, NamedTuple, Optional, Literal
+from typing import Any, Callable, NamedTuple, Optional, Literal, Iterator, Tuple
 from typing_extensions import Self
 
 import torch
@@ -8,10 +8,15 @@ from torch.utils.data import Dataset
 from torch._prims_common import DeviceLikeType
 from pydantic import BaseModel
 
+
 @dataclass
 class Sample:
     input: torch.Tensor
     target: Any
+
+    def __iter__(self):
+        return (self.input, self.target)
+
 
 @dataclass
 class Batch:
