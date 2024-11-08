@@ -73,20 +73,21 @@ class BaseExperiment(metaclass=ABCMeta):
         self.raw_config = config
 
         self.checkpoint_history = None
-
-        self.results_dir = (
+        proposed_results_dir = (
             os.path.join(
                 yaml_config.results_dir,
                 self.get_name(),
-                f"{datetime.now():%Y-%m-%d_%H#%M#%S}",
             )
             if self.base_config.results_subdir_name is None
             else os.path.join(
                 yaml_config.results_dir,
                 self.get_name(),
                 self.base_config.results_subdir_name,
-                f"{datetime.now():%Y-%m-%d_%H#%M#%S}",
             )
+        )
+        self.results_dir = os.path.join(
+            self.get_results_dir(proposed_results_dir),
+            f"{datetime.now():%Y-%m-%d_%H#%M#%S}",
         )
 
         os.makedirs(self.results_dir, exist_ok=True)
@@ -145,6 +146,9 @@ class BaseExperiment(metaclass=ABCMeta):
                     self.process_test_results(test_results)
                 self.run_after_training(self.model)
             print(f"Done. Saved results to {self.results_dir}")
+
+    def get_results_dir(self, proposed_dir: str) -> str:
+        return proposed_dir
 
     def run_after_training(self, trained_model: BaseModel):
         pass
