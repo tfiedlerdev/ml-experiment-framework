@@ -20,6 +20,15 @@ class YamlConfigModel(BaseModel):
     results_dir: str = Field(
         default="results", description="Output directory for experiment results"
     )
+    ukbiobank_data_dir: str = Field(
+        default="/dhc/projects/ukbiobank/derived/imaging/retinal_fundus/images_resized_224",
+        description="Directory where UK Biobank data is stored",
+    )
+    # TODO: Generate masks and reference here
+    ukbiobank_masks_dir: str = Field(
+        default="<placeholder>",
+        description="Directory where UK Biobank masks are stored",
+    )
     refuge_dset_path: str = Field(
         default="/dhc/dsets/REFUGE/REFUGE", description="The path to retina dataset"
     )
