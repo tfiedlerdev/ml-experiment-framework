@@ -73,20 +73,21 @@ class BaseExperiment(metaclass=ABCMeta):
         self.raw_config = config
 
         self.checkpoint_history = None
-
-        self.results_dir = (
+        proposed_results_dir = (
             os.path.join(
                 yaml_config.results_dir,
                 self.get_name(),
-                f"{datetime.now():%Y-%m-%d_%H#%M#%S}",
             )
             if self.base_config.results_subdir_name is None
             else os.path.join(
                 yaml_config.results_dir,
                 self.get_name(),
                 self.base_config.results_subdir_name,
-                f"{datetime.now():%Y-%m-%d_%H#%M#%S}",
             )
+        )
+        self.results_dir = os.path.join(
+            self.get_results_dir(proposed_results_dir),
+            f"{datetime.now():%Y-%m-%d_%H#%M#%S}",
         )
 
         os.makedirs(self.results_dir, exist_ok=True)
@@ -97,11 +98,7 @@ class BaseExperiment(metaclass=ABCMeta):
         self.model = self._create_model().to(self.get_device())
         self.checkpoint_history = None
         if self.base_config.from_checkpoint is not None:
-            print(f"loading model from checkpoint {self.base_config.from_checkpoint}")
-            self.model.load_state_dict(
-                torch.load(self.base_config.from_checkpoint, map_location="cuda"),
-                strict=True,
-            )
+            self.load_trained_model(self.base_config.from_checkpoint)
             history_path = os.path.join(
                 os.path.dirname(self.base_config.from_checkpoint), "history.json"
             )
@@ -141,13 +138,27 @@ class BaseExperiment(metaclass=ABCMeta):
 
                 self.plot_results(history)
                 self.process_test_results(history.test_losses)
+                self.run_after_training(trained_model)
             else:
                 test_results = trainer.evaluate_epoch("test")
                 if test_results is not None:
                     wandb.log(trainer._get_wandb_metrics(test_results, "test"))
                     self.process_test_results(test_results)
-
+                self.run_after_training(self.model)
             print(f"Done. Saved results to {self.results_dir}")
+
+    def get_results_dir(self, proposed_dir: str) -> str:
+        return proposed_dir
+
+    def run_after_training(self, trained_model: BaseModel):
+        pass
+
+    def load_trained_model(self, path: str):
+        print(f"loading model from checkpoint {path}")
+        self.model.load_state_dict(
+            torch.load(path, map_location="cuda"),
+            strict=True,
+        )
 
     def store_trained_model(self, trained_model: torch.nn.Module):
         torch.save(

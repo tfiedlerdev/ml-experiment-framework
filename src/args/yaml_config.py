@@ -24,6 +24,7 @@ class YamlConfigModel(BaseModel):
         default="/dhc/projects/ukbiobank/derived/imaging/retinal_fundus/images_resized_224",
         description="Directory where UK Biobank data is stored",
     )
+    retina_dset_path: str = Field(description="The path to retina dataset")
 
 
 class YamlConfig:
