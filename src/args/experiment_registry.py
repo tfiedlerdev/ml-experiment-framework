@@ -1,5 +1,6 @@
 from typing import Type
 from src.experiments.multi_ds_vessel_experiment import MultiDsVesselExperiment
+from src.experiments.hrf_experiment import HrfExperiment
 from src.experiments.drive_experiment import DriveExperiment
 from src.experiments.refuge_experiment import RefugeExperiment
 from src.experiments.mnist_experiment import MnistExperiment
@@ -10,4 +11,5 @@ experiments: dict[str, Type[BaseExperiment]] = {
     "refuge": RefugeExperiment,
     "drive": DriveExperiment,
     "multi_ds_vessel": MultiDsVesselExperiment,
+    "hrf": HrfExperiment,
 }
