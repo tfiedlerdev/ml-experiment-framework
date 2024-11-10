@@ -36,7 +36,9 @@ class YamlConfigModel(BaseModel):
         default="/dhc/dsets/DRIVE/training", description="The path to the DRIVE dataset"
     )
     hrf_dset_path: str = Field(
-        default="/dhc/dsets/HRF/", description="The path to the HRF dataset"
+        default="/dhc/dsets/HRF/", description="The path to the HRF dataset")
+    stare_dset_path: str = Field(
+        default="/dhc/dsets/STARE-Vessels", description="The path to the STARE dataset"
     )
 
 
