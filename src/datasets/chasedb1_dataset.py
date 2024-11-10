@@ -20,30 +20,31 @@ from PIL import Image
 
 
 @dataclass
-class DriveSample(Sample):
+class ChaseDb1Sample(Sample):
     original_size: torch.Tensor
     image_size: torch.Tensor
 
 
 @dataclass
-class DriveFileReference:
+class ChaseDb1FileReference:
     img_path: str
     gt_path: str
+    id: str
     split: str
 
 
-class DriveDatasetArgs(BaseModel):
+class ChaseDb1DatasetArgs(BaseModel):
     """Define arguments for the dataset here, i.e. preprocessing related stuff etc"""
 
     pass
 
 
-class DriveDataset(BaseDataset):
+class ChaseDb1Dataset(BaseDataset):
     def __init__(
         self,
-        config: DriveDatasetArgs,
+        config: ChaseDb1DatasetArgs,
         yaml_config: YamlConfigModel,
-        samples: Optional[list[DriveFileReference]] = None,
+        samples: Optional[list[ChaseDb1FileReference]] = None,
         image_enc_img_size=1024,
     ):
         self.yaml_config = yaml_config
@@ -51,7 +52,7 @@ class DriveDataset(BaseDataset):
         self.samples = self.load_data() if samples is None else samples
         self.sam_trans = ResizeLongestSide(image_enc_img_size)
 
-    def __getitem__(self, index: int) -> DriveSample:
+    def __getitem__(self, index: int) -> ChaseDb1Sample:
         sample = self.samples[index]
         train_transform, test_transform = get_polyp_transform()
 
@@ -70,7 +71,7 @@ class DriveDataset(BaseDataset):
         mask[mask <= 0.5] = 0
         image_size = tuple(img.shape[1:3])
 
-        return DriveSample(
+        return ChaseDb1Sample(
             input=self.sam_trans.preprocess(img),
             target=self.sam_trans.preprocess(mask),
             original_size=torch.Tensor(original_size),
@@ -81,7 +82,7 @@ class DriveDataset(BaseDataset):
         return len(self.samples)
 
     def get_collate_fn(self):  # type: ignore
-        def collate(samples: list[DriveSample]):
+        def collate(samples: list[ChaseDb1Sample]):
             inputs = torch.stack([s.input for s in samples])
             targets = torch.stack([s.target for s in samples])
             original_size = torch.stack([s.original_size for s in samples])
@@ -93,7 +94,10 @@ class DriveDataset(BaseDataset):
         return collate
 
     def get_split(self, split: Literal["train", "val", "test"]) -> Self:
-        samples = self.samples[0:15] if split == "train" else self.samples[15:20]
+        if split == "test":
+            # we only have train and val split here
+            split = "val"
+        samples = [s for s in self.samples if s.split == split]
         return self.__class__(
             self.config,
             self.yaml_config,
@@ -101,23 +105,34 @@ class DriveDataset(BaseDataset):
         )
 
     def load_data(self):
-        imgs_dir = os.path.join(self.yaml_config.drive_dset_path, "images")
-        gts_dir = os.path.join(self.yaml_config.drive_dset_path, "1st_manual")
+        dir = self.yaml_config.chasedb1_dset_path
 
-        images_and_masks_paths = [
-            (
-                str(Path(imgs_dir) / img_file),
-                str(Path(gts_dir) / f"{img_file[0:2]}_manual1.gif"),
-            )
-            for img_file in os.listdir(imgs_dir)
-        ]
+        imgs = [f for f in os.listdir(dir) if f.endswith(".jpg")]
 
-        return [
-            DriveFileReference(
-                img_path=img, gt_path=mask, split="train" if i < 15 else "val"
+        refs = []
+        for i, img_file_name in enumerate(imgs):
+            is_train = i / len(imgs) < 0.8
+            img = str(Path(dir) / img_file_name)
+            gt1 = str(Path(dir) / img_file_name.replace(".jpg", "_1stHO.png"))
+            gt2 = str(Path(dir) / img_file_name.replace(".jpg", "_2ndHO.png"))
+            refs.append(
+                ChaseDb1FileReference(
+                    img_path=img,
+                    gt_path=gt1,
+                    id=img_file_name,
+                    split="train" if is_train else "val",
+                )
             )
-            for i, (img, mask) in enumerate(images_and_masks_paths)
-        ]
+            refs.append(
+                ChaseDb1FileReference(
+                    img_path=img,
+                    gt_path=gt2,
+                    id=img_file_name,
+                    split="train" if is_train else "val",
+                )
+            )
+
+        return refs
 
     def filter_files(self, old_images, old_gts):
         assert len(old_images) == len(old_gts)

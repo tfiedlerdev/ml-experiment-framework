@@ -35,6 +35,9 @@ class YamlConfigModel(BaseModel):
     drive_dset_path: str = Field(
         default="/dhc/dsets/DRIVE/training", description="The path to the DRIVE dataset"
     )
+    chasedb1_dset_path: str = Field(
+        default="/dhc/dsets/ChaseDb1",
+        description="The path to the CHASEDB1 dataset",
     hrf_dset_path: str = Field(
         default="/dhc/dsets/HRF/", description="The path to the HRF dataset")
     stare_dset_path: str = Field(
