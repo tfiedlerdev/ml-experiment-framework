@@ -20,7 +20,12 @@ class YamlConfigModel(BaseModel):
     results_dir: str = Field(
         default="results", description="Output directory for experiment results"
     )
-    retina_dset_path: str = Field(description="The path to retina dataset")
+    refuge_dset_path: str = Field(
+        default="/dhc/dsets/REFUGE/REFUGE", description="The path to retina dataset"
+    )
+    drive_dset_path: str = Field(
+        default="/dhc/dsets/DRIVE/training", description="The path to the DRIVE dataset"
+    )
 
 
 class YamlConfig:

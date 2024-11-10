@@ -2,8 +2,9 @@ from dataclasses import dataclass
 from pathlib import Path
 import re
 from src.models.auto_sam_model import SAMBatch
+from src.datasets.refuge_dataset import get_polyp_transform
 import src.util.transforms_shir as transforms
-
+import numpy as np
 import cv2
 from src.datasets.base_dataset import BaseDataset, Batch, Sample
 from src.models.segment_anything.utils.transforms import ResizeLongestSide
@@ -19,58 +20,29 @@ from PIL import Image
 
 
 @dataclass
-class RefugeSample(Sample):
+class DriveSample(Sample):
     original_size: torch.Tensor
     image_size: torch.Tensor
 
 
 @dataclass
-class RefugeFileReference:
+class DriveFileReference:
     img_path: str
     gt_path: str
-    split: str
 
 
-def get_polyp_transform():
-    transform_train = transforms.Compose(
-        [
-            # transforms.Resize((352, 352)),
-            transforms.ToPILImage(),
-            transforms.ColorJitter(
-                brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1  # type: ignore
-            ),
-            transforms.RandomVerticalFlip(),
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomAffine(90, scale=(0.75, 1.25)),
-            transforms.ToTensor(),
-            # transforms.Normalize([105.61, 63.69, 45.67],
-            #                      [83.08, 55.86, 42.59])
-        ]
-    )
-    transform_test = transforms.Compose(
-        [
-            # transforms.Resize((352, 352)),
-            transforms.ToPILImage(),
-            transforms.ToTensor(),
-            # transforms.Normalize([105.61, 63.69, 45.67],
-            #                      [83.08, 55.86, 42.59])
-        ]
-    )
-    return transform_train, transform_test
-
-
-class RefugeDatasetArgs(BaseModel):
+class DriveDatasetArgs(BaseModel):
     """Define arguments for the dataset here, i.e. preprocessing related stuff etc"""
 
-    target: Literal["cup", "disc"]
+    pass
 
 
-class RefugeDataset(BaseDataset):
+class DriveDataset(BaseDataset):
     def __init__(
         self,
-        config: RefugeDatasetArgs,
+        config: DriveDatasetArgs,
         yaml_config: YamlConfigModel,
-        samples: Optional[list[RefugeFileReference]] = None,
+        samples: Optional[list[DriveFileReference]] = None,
         image_enc_img_size=1024,
     ):
         self.yaml_config = yaml_config
@@ -78,11 +50,11 @@ class RefugeDataset(BaseDataset):
         self.samples = self.load_data() if samples is None else samples
         self.sam_trans = ResizeLongestSide(image_enc_img_size)
 
-    def __getitem__(self, index: int) -> RefugeSample:
+    def __getitem__(self, index: int) -> DriveSample:
         sample = self.samples[index]
         train_transform, test_transform = get_polyp_transform()
 
-        augmentations = test_transform if sample.split == "test" else train_transform
+        augmentations = train_transform
 
         image = self.cv2_loader(sample.img_path, is_mask=False)
         gt = self.cv2_loader(sample.gt_path, is_mask=True)
@@ -97,7 +69,7 @@ class RefugeDataset(BaseDataset):
         mask[mask <= 0.5] = 0
         image_size = tuple(img.shape[1:3])
 
-        return RefugeSample(
+        return DriveSample(
             input=self.sam_trans.preprocess(img),
             target=self.sam_trans.preprocess(mask),
             original_size=torch.Tensor(original_size),
@@ -108,7 +80,7 @@ class RefugeDataset(BaseDataset):
         return len(self.samples)
 
     def get_collate_fn(self):  # type: ignore
-        def collate(samples: list[RefugeSample]):
+        def collate(samples: list[DriveSample]):
             inputs = torch.stack([s.input for s in samples])
             targets = torch.stack([s.target for s in samples])
             original_size = torch.stack([s.original_size for s in samples])
@@ -120,20 +92,32 @@ class RefugeDataset(BaseDataset):
         return collate
 
     def get_split(self, split: Literal["train", "val", "test"]) -> Self:
-
+        samples = self.samples[0:15] if split == "train" else self.samples[15:20]
         return self.__class__(
             self.config,
             self.yaml_config,
-            [sample for sample in self.samples if sample.split == split],
+            samples,
         )
 
     def load_data(self):
+        imgs_dir = os.path.join(self.yaml_config.drive_dset_path, "images")
+        gts_dir = os.path.join(self.yaml_config.drive_dset_path, "1st_manual")
 
-        train = self.load_data_for_split("train")
-        val = self.load_data_for_split("val")
-        test = self.load_data_for_split("test")
+        images_and_masks_paths = [
+            (
+                str(Path(imgs_dir) / img_file),
+                str(Path(gts_dir) / f"{img_file[0:2]}_manual1.gif"),
+            )
+            for img_file in os.listdir(imgs_dir)
+        ]
 
-        return train + val + test
+        return [
+            DriveFileReference(
+                img_path=img,
+                gt_path=mask,
+            )
+            for img, mask in images_and_masks_paths
+        ]
 
     def filter_files(self, old_images, old_gts):
         assert len(old_images) == len(old_gts)
@@ -148,45 +132,10 @@ class RefugeDataset(BaseDataset):
 
         return images, gts
 
-    def load_data_for_split(self, split):
-        dir_names = {
-            "train": "Training-400",
-            "val": "Validation-400",
-            "test": "Test-400",
-        }
-        dir = os.path.join(self.yaml_config.refuge_dset_path, dir_names[split])
-
-        images_and_masks_paths = [
-            (
-                str(
-                    Path(self.yaml_config.refuge_dset_path)
-                    / dir
-                    / subdir
-                    / f"{subdir}.jpg"
-                ),
-                str(
-                    Path(self.yaml_config.refuge_dset_path)
-                    / dir
-                    / subdir
-                    / f"{subdir}_seg_{self.config.target}_1.png"
-                ),
-            )
-            for subdir in os.listdir(dir)
-            if re.search("\d\d\d\d", subdir) is not None
-        ]
-
-        return [
-            RefugeFileReference(
-                img_path=img,
-                gt_path=mask,
-                split=split,
-            )
-            for img, mask in images_and_masks_paths
-        ]
-
     def cv2_loader(self, path, is_mask):
         if is_mask:
-            img = cv2.imread(path, 0)
+            with Image.open(path) as im:
+                img = np.array(im.convert("L"))
             img[img > 0] = 1
         else:
             img = cv2.cvtColor(cv2.imread(path, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)

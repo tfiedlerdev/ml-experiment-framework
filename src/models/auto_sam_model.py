@@ -1,7 +1,7 @@
+from dataclasses import dataclass
 from typing import Literal
 
 import torch
-from src.datasets.refuge_dataset import RefugeBatch
 from src.models.segment_anything.build_sam import (
     build_sam_vit_b,
     build_sam_vit_h,
@@ -45,8 +45,14 @@ sam_model_registry = {
 }
 
 
+@dataclass
+class SAMBatch(Batch):
+    original_size: torch.Tensor
+    image_size: torch.Tensor
+
+
 # Source of most of this code: https://github.com/talshaharabany/AutoSAM
-class AutoSamModel(BaseModel[RefugeBatch]):
+class AutoSamModel(BaseModel[SAMBatch]):
     def __init__(self, config: AutoSamModelArgs):
         super().__init__()
         self.sam = sam_model_registry[config.sam_model](
@@ -60,7 +66,7 @@ class AutoSamModel(BaseModel[RefugeBatch]):
         )
         self.config = config
 
-    def forward(self, batch: RefugeBatch) -> ModelOutput:
+    def forward(self, batch: SAMBatch) -> ModelOutput:
         Idim = self.config.Idim
         orig_imgs_small = F.interpolate(
             batch.input, (Idim, Idim), mode="bilinear", align_corners=True
@@ -73,7 +79,7 @@ class AutoSamModel(BaseModel[RefugeBatch]):
 
         return ModelOutput(masks)
 
-    def compute_loss(self, outputs: ModelOutput, batch: RefugeBatch) -> Loss:
+    def compute_loss(self, outputs: ModelOutput, batch: SAMBatch) -> Loss:
         assert batch.target is not None
         size = outputs.logits.shape[2:]
         gts_sized = F.interpolate(batch.target.unsqueeze(dim=1), size, mode="nearest")
