@@ -18,21 +18,21 @@ from PIL import Image
 
 
 @dataclass
-class RetinaSample(Sample):
+class RefugeSample(Sample):
     split: str
     original_size: torch.Tensor
     image_size: torch.Tensor
 
 
 @dataclass
-class RetinaFileReference:
+class RefugeFileReference:
     img_path: str
     gt_path: str
     split: str
 
 
 @dataclass
-class RetinaBatch(Batch):
+class RefugeBatch(Batch):
     original_size: torch.Tensor
     image_size: torch.Tensor
 
@@ -65,20 +65,19 @@ def get_polyp_transform():
     return transform_train, transform_test
 
 
-class RetinaDatasetArgs(BaseModel):
+class RefugeDatasetArgs(BaseModel):
     """Define arguments for the dataset here, i.e. preprocessing related stuff etc"""
 
     img_size: int = 352
     target: Literal["cup", "disc"]
-    pass
 
 
-class RetinaDataset(BaseDataset):
+class RefugeDataset(BaseDataset):
     def __init__(
         self,
-        config: RetinaDatasetArgs,
+        config: RefugeDatasetArgs,
         yaml_config: YamlConfigModel,
-        samples: Optional[list[RetinaFileReference]] = None,
+        samples: Optional[list[RefugeFileReference]] = None,
         image_enc_img_size=1024,
     ):
         self.yaml_config = yaml_config
@@ -86,7 +85,7 @@ class RetinaDataset(BaseDataset):
         self.samples = self.load_data() if samples is None else samples
         self.sam_trans = ResizeLongestSide(image_enc_img_size)
 
-    def __getitem__(self, index: int) -> RetinaSample:
+    def __getitem__(self, index: int) -> RefugeSample:
         sample = self.samples[index]
         train_transform, test_transform = get_polyp_transform()
 
@@ -105,7 +104,7 @@ class RetinaDataset(BaseDataset):
         mask[mask <= 0.5] = 0
         image_size = tuple(img.shape[1:3])
 
-        return RetinaSample(
+        return RefugeSample(
             input=self.sam_trans.preprocess(img),
             target=self.sam_trans.preprocess(mask),
             original_size=torch.Tensor(original_size),
@@ -117,12 +116,12 @@ class RetinaDataset(BaseDataset):
         return len(self.samples)
 
     def get_collate_fn(self):  # type: ignore
-        def collate(samples: list[RetinaSample]):
+        def collate(samples: list[RefugeSample]):
             inputs = torch.stack([s.input for s in samples])
             targets = torch.stack([s.target for s in samples])
             original_size = torch.stack([s.original_size for s in samples])
             image_size = torch.stack([s.image_size for s in samples])
-            return RetinaBatch(
+            return RefugeBatch(
                 inputs, targets, original_size=original_size, image_size=image_size
             )
 
@@ -185,7 +184,7 @@ class RetinaDataset(BaseDataset):
         ]
 
         return [
-            RetinaFileReference(
+            RefugeFileReference(
                 img_path=img,
                 gt_path=mask,
                 split=split,

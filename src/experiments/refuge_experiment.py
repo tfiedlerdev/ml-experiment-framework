@@ -1,7 +1,7 @@
 from typing import Literal, Any, Optional
 import torch
 from torch.optim.optimizer import Optimizer
-from src.datasets.refuge_dataset import RetinaDataset, RetinaDatasetArgs
+from src.datasets.refuge_dataset import RefugeDataset, RefugeDatasetArgs
 from src.models.auto_sam_model import AutoSamModel, AutoSamModelArgs
 from src.experiments.base_experiment import BaseExperiment, BaseExperimentArgs
 from src.models.base_model import BaseModel
@@ -14,8 +14,8 @@ import os
 from pydantic import Field
 
 
-class RetinaExperimentArgs(
-    BaseExperimentArgs, AdamArgs, StepLRArgs, RetinaDatasetArgs, AutoSamModelArgs
+class RefugeExperimentArgs(
+    BaseExperimentArgs, AdamArgs, StepLRArgs, RefugeDatasetArgs, AutoSamModelArgs
 ):
     prompt_encoder_checkpoint: Optional[str] = Field(
         default=None, description="Path to prompt encoder checkpoint"
@@ -25,14 +25,14 @@ class RetinaExperimentArgs(
     )
 
 
-class RetinaExperiment(BaseExperiment):
+class RefugeExperiment(BaseExperiment):
     def __init__(self, config: dict[str, Any], yaml_config: YamlConfigModel):
-        self.config = RetinaExperimentArgs(**config)
-        self.retina_data = RetinaDataset(config=self.config, yaml_config=yaml_config)
+        self.config = RefugeExperimentArgs(**config)
+        self.retina_data = RefugeDataset(config=self.config, yaml_config=yaml_config)
         super().__init__(config, yaml_config)
 
     def get_name(self) -> str:
-        return "retina_experiment"
+        return "refuge_experiment"
 
     def _create_dataset(
         self, split: Literal["train", "val", "test"] = "train"
@@ -53,7 +53,7 @@ class RetinaExperiment(BaseExperiment):
 
     @classmethod
     def get_args_model(cls):
-        return RetinaExperimentArgs
+        return RefugeExperimentArgs
 
     def create_optimizer(self) -> Optimizer:
         return create_adam_optimizer(self.model, self.config)
@@ -77,7 +77,7 @@ class RetinaExperiment(BaseExperiment):
         model = cast(AutoSamModel, trained_model)
         out_dir = os.path.join(self.results_dir, "test_visualizations")
         os.makedirs(out_dir, exist_ok=True)
-        ds = cast(RetinaDataset, self._create_dataset("test"))
+        ds = cast(RefugeDataset, self._create_dataset("test"))
         print(f"\nCreating {self.config.visualize_n_segmentations} test segmentations")
         for i in range(min(len(ds.samples), self.config.visualize_n_segmentations)):
             sample = ds.samples[i]
