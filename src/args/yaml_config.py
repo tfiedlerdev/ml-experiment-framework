@@ -29,7 +29,12 @@ class YamlConfigModel(BaseModel):
         default="<placeholder>",
         description="Directory where UK Biobank masks are stored",
     )
-    retina_dset_path: str = Field(description="The path to retina dataset")
+    refuge_dset_path: str = Field(
+        default="/dhc/dsets/REFUGE/REFUGE", description="The path to retina dataset"
+    )
+    drive_dset_path: str = Field(
+        default="/dhc/dsets/DRIVE/training", description="The path to the DRIVE dataset"
+    )
 
 
 class YamlConfig:
