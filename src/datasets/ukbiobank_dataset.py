@@ -11,7 +11,7 @@ from src.args.yaml_config import YamlConfigModel
 from src.datasets.base_dataset import BaseDataset, Batch, Sample
 from pydantic import BaseModel
 
-from src.datasets.retina_dataset import get_polyp_transform
+from src.datasets.refuge_dataset import get_polyp_transform
 from src.models.segment_anything.utils.transforms import ResizeLongestSide
 
 
