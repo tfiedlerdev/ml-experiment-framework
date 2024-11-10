@@ -35,6 +35,9 @@ class YamlConfigModel(BaseModel):
     drive_dset_path: str = Field(
         default="/dhc/dsets/DRIVE/training", description="The path to the DRIVE dataset"
     )
+    stare_dset_path: str = Field(
+        default="/dhc/dsets/STARE-Vessels", description="The path to the STARE dataset"
+    )
 
 
 class YamlConfig:
