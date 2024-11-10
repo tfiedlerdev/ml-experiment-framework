@@ -1,7 +1,7 @@
 from typing import Literal, Any, Optional
 import torch
 from torch.optim.optimizer import Optimizer
-from src.datasets.retina_dataset import RetinaDataset, RetinaDatasetArgs
+from src.datasets.refuge_dataset import RetinaDataset, RetinaDatasetArgs
 from src.models.auto_sam_model import AutoSamModel, AutoSamModelArgs
 from src.experiments.base_experiment import BaseExperiment, BaseExperimentArgs
 from src.models.base_model import BaseModel
