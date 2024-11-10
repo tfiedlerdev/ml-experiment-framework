@@ -67,3 +67,31 @@ class BaseDataset(Dataset):
     @abstractmethod
     def get_split(self, split: Literal["train", "val", "test"]) -> Self:
         pass
+
+
+class JoinedDataset(BaseDataset):
+    def __init__(self, datasets: list[BaseDataset], collate: Optional[Callable] = None):
+        self.datasets = datasets
+        if collate is not None:
+            self.get_collate_fn = lambda: collate
+        self.collate = collate
+
+    def __getitem__(self, index: int) -> Sample:
+        dataset_index, sample_index = self.get_dataset_and_sample_index(index)
+        return self.datasets[dataset_index][sample_index]
+
+    def get_dataset_and_sample_index(self, index: int) -> Tuple[int, int]:
+        for dataset_index, dataset in enumerate(self.datasets):
+            if index < len(dataset):
+                return dataset_index, index
+            index -= len(dataset)
+
+        raise IndexError("Index out of range")
+
+    def __len__(self) -> int:
+        return sum(len(dataset) for dataset in self.datasets)
+
+    def get_split(self, split: Literal["train", "val", "test"]) -> Self:
+        return self.__class__(
+            [dataset.get_split(split) for dataset in self.datasets], self.collate
+        )
