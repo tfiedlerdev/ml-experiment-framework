@@ -38,10 +38,16 @@ class YamlConfigModel(BaseModel):
     chasedb1_dset_path: str = Field(
         default="/dhc/dsets/ChaseDb1",
         description="The path to the CHASEDB1 dataset",
+    )
     hrf_dset_path: str = Field(
-        default="/dhc/dsets/HRF/", description="The path to the HRF dataset")
+        default="/dhc/dsets/HRF/", description="The path to the HRF dataset"
+    )
     stare_dset_path: str = Field(
         default="/dhc/dsets/STARE-Vessels", description="The path to the STARE dataset"
+    )
+    filter_dset_path: str = Field(
+        default="/dhc/dsets/FilterDataset",
+        description="The path to the FilterDataset",
     )
 
 
