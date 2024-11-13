@@ -25,6 +25,16 @@
                 "--batch_size=3",
                 "--epochs=5"
             ]
+        },
+        {
+            "name": "Run.py filter model",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/run.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--experiment_id=resnet_filter",
+            ]
         }
     ]
 }
