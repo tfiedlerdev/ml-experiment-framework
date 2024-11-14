@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, Optional
 
 import torch
 from src.models.segment_anything.build_sam import (
@@ -92,14 +92,8 @@ class AutoSamModel(BaseModel[SAMBatch]):
         original_size = tuple(
             [int(x) for x in batch.original_size[0].squeeze().tolist()]
         )
-        masks = self.sam.postprocess_masks(
-            outputs.logits, input_size=input_size, original_size=original_size
-        )
-        gts = self.sam.postprocess_masks(
-            batch.target.unsqueeze(dim=0),
-            input_size=input_size,
-            original_size=original_size,
-        )
+        masks = outputs.logits
+        gts = batch.target.unsqueeze(dim=0)
         masks = F.interpolate(
             masks,
             (self.config.Idim, self.config.Idim),
@@ -162,10 +156,7 @@ class AutoSamModel(BaseModel[SAMBatch]):
         dense_embeddings = self.prompt_encoder.forward(orig_imgs_small)
 
         mask = sam_call(input_images, self.sam, dense_embeddings)
-        input_size = image_tensor.shape[1:]
-        mask = self.sam.postprocess_masks(
-            mask, input_size=input_size, original_size=original_size
-        )
+        mask = F.interpolate(mask, original_size, mode="bilinear", align_corners=True)
         mask = mask.squeeze().cpu().numpy()
         mask = (mask - mask.min()) / (mask.max() - mask.min())
         mask = (255 * mask).astype(np.uint8)
@@ -179,15 +170,30 @@ class AutoSamModel(BaseModel[SAMBatch]):
         return self.segment_image(image)
 
     def segment_and_write_image_from_file(
-        self, image_path: str, output_path: str, mask_opacity: float = 0.4
+        self,
+        image_path: str,
+        output_path: str,
+        mask_opacity: float = 0.4,
+        gts_path: Optional[str] = None,
     ):
         import cv2
+        from PIL import Image
 
         image, mask = self.segment_image_from_file(image_path)
-        overlay = (np.array(mask) * np.array([1, 1, 0])).astype(image.dtype)
+        if gts_path is not None:
+            with Image.open(gts_path) as im:
+                gts = np.array(im.convert("RGB"))
+        else:
+            gts = np.zeros_like(mask)
+        mask[mask > 255 / 2] = 255
+        mask[mask <= 255 / 2] = 0
+        overlay = (
+            np.array(mask) * np.array([1, 0, 1]) + np.array(gts) * np.array([0, 1, 0])
+        ).astype(image.dtype)
         output_image = cv2.addWeighted(
             image, 1 - mask_opacity, overlay, mask_opacity, 0
         )
+
         cv2.imwrite(output_path, output_image)
 
 
