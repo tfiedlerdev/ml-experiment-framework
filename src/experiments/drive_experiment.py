@@ -87,7 +87,9 @@ class DriveExperiment(BaseExperiment):
             for i in range(min(len(ds.samples), self.config.visualize_n_segmentations)):
                 sample = ds.samples[i]
                 out_path = os.path.join(out_dir, f"{i}.png")
-                model.segment_and_write_image_from_file(sample.img_path, out_path)
+                model.segment_and_write_image_from_file(
+                    sample.img_path, out_path, gts_path=sample.gt_path
+                )
                 print(
                     f"{i+1}/{self.config.visualize_n_segmentations} {split} segmentations created\r",
                     end="",

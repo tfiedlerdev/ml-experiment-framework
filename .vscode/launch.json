@@ -34,7 +34,43 @@
             "console": "integratedTerminal",
             "args": [
                 "--experiment_id=resnet_filter",
+                "--sam_model=vit_b",
+                "--learning_rate=0.0003",
+                "--batch_size=3",
+                "--epochs=100",
+                "--weight_decay=1e-4",
+                "--early_stopping_patience=10",
+                "--visualize_n_segmentations=5",
+                "--gamma=0.85",
+                "--step_size=5",
+                "--best_model_metric=IoU",
+                "--minimize_best_model_metric=false",
+                "--prompt_encoder_checkpoint=/dhc/home/tobias.fiedler/mp-lippert-experiments/results/drive_experiment/2024-11-10_13#21#22/prompt_encoder.pt",
+                "--only_test=true"
             ]
-        }
+        },
+        {
+            "name": "Run.py with drive",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/run.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--experiment_id=drive",
+                "--sam_model=vit_b",
+                "--learning_rate=0.0003",
+                "--batch_size=3",
+                "--epochs=100",
+                "--weight_decay=1e-4",
+                "--early_stopping_patience=10",
+                "--visualize_n_segmentations=5",
+                "--gamma=0.85",
+                "--step_size=5",
+                "--best_model_metric=IoU",
+                "--minimize_best_model_metric=false",
+                "--prompt_encoder_checkpoint=/dhc/home/tobias.fiedler/mp-lippert-experiments/results/drive_experiment/2024-11-10_13#21#22/prompt_encoder.pt",
+                "--only_test=true"
+            ]
+        },
     ]
 }
