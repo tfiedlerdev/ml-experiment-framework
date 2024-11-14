@@ -94,6 +94,14 @@ class AutoSamModel(BaseModel[SAMBatch]):
         )
         masks = outputs.logits
         gts = batch.target.unsqueeze(dim=0)
+        masks = self.sam.postprocess_masks(
+            outputs.logits, input_size=input_size, original_size=original_size
+        )
+        gts = self.sam.postprocess_masks(
+            batch.target.unsqueeze(dim=0),
+            input_size=input_size,
+            original_size=original_size,
+        )
         masks = F.interpolate(
             masks,
             (self.config.Idim, self.config.Idim),
@@ -156,6 +164,7 @@ class AutoSamModel(BaseModel[SAMBatch]):
         dense_embeddings = self.prompt_encoder.forward(orig_imgs_small)
 
         mask = sam_call(input_images, self.sam, dense_embeddings)
+
         mask = F.interpolate(mask, original_size, mode="bilinear", align_corners=True)
         mask = mask.squeeze().cpu().numpy()
         mask = (mask - mask.min()) / (mask.max() - mask.min())
