@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from typing import Literal, Optional
 import numpy as np
+from sympy import im
 import torch
 import cv2
 from typing_extensions import Self
@@ -33,12 +34,14 @@ class BiobankSample(Sample):
     split: str
     original_size: torch.Tensor
     image_size: torch.Tensor
+    img_path: Path
 
 
 @dataclass
 class BiobankBatch(Batch):
     original_size: torch.Tensor
     image_size: torch.Tensor
+    file_paths: list[Path]
 
 
 class UkBiobankDataset(BaseDataset):
@@ -85,6 +88,7 @@ class UkBiobankDataset(BaseDataset):
             original_size=torch.Tensor(original_size),
             image_size=torch.Tensor(image_size),
             split=sample.split,
+            img_path=sample.img_path,
         )
 
     def __len__(self):
@@ -97,7 +101,7 @@ class UkBiobankDataset(BaseDataset):
             original_size = torch.stack([s.original_size for s in samples])
             image_size = torch.stack([s.image_size for s in samples])
             return BiobankBatch(
-                inputs, targets, original_size=original_size, image_size=image_size
+                inputs, targets, original_size=original_size, image_size=image_size, file_paths=[s.img_path for s in samples]
             )
 
         return collate
