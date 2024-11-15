@@ -72,10 +72,7 @@ class AutoSamModel(BaseModel[SAMBatch]):
             batch.input, (Idim, Idim), mode="bilinear", align_corners=True
         )
         dense_embeddings = self.prompt_encoder(orig_imgs_small)
-        batched_input = get_input_dict(
-            batch.input, batch.original_size, batch.image_size
-        )
-        masks = norm_batch(sam_call(batched_input, self.sam, dense_embeddings))
+        masks = norm_batch(sam_call(batch.input, self.sam, dense_embeddings))
 
         return ModelOutput(masks)
 
@@ -88,10 +85,8 @@ class AutoSamModel(BaseModel[SAMBatch]):
         dice_loss = compute_dice_loss(outputs.logits, gts_sized)
         loss_value = bce + dice_loss
 
-        input_size = tuple([int(x) for x in batch.image_size[0].squeeze().tolist()])
-        original_size = tuple(
-            [int(x) for x in batch.original_size[0].squeeze().tolist()]
-        )
+        input_size = tuple(batch.image_size[0][-2:].int().tolist())
+        original_size = tuple(batch.original_size[0][-2:].int().tolist())
         masks = outputs.logits
         gts = batch.target.unsqueeze(dim=0)
         masks = self.sam.postprocess_masks(
@@ -130,42 +125,24 @@ class AutoSamModel(BaseModel[SAMBatch]):
         import cv2
         from .segment_anything.utils.transforms import ResizeLongestSide
 
-        def sam_call(batched_input, sam, dense_embeddings):
-            with torch.no_grad():
-                input_images = torch.stack(
-                    [sam.preprocess(x) for x in batched_input], dim=0
-                )
-                image_embeddings = sam.image_encoder(input_images)
-                sparse_embeddings_none, dense_embeddings_none = sam.prompt_encoder(
-                    points=None, boxes=None, masks=None
-                )
-
-                low_res_masks, iou_predictions = sam.mask_decoder(
-                    image_embeddings=image_embeddings,
-                    image_pe=sam.prompt_encoder.get_dense_pe(),
-                    sparse_prompt_embeddings=sparse_embeddings_none,
-                    dense_prompt_embeddings=dense_embeddings,
-                    multimask_output=False,
-                )
-            return low_res_masks
-
         original_size = image.shape[:2]
         transform = ResizeLongestSide(1024)
-        Idim = 512
-        image_tensor = torch.tensor(image).permute(2, 0, 1).float() / 255.0
+        Idim = self.config.Idim
+        image_tensor = torch.tensor(image).permute(2, 0, 1).float()
         image_tensor = transform.apply_image_torch(image_tensor)
-
-        input_images = transform.preprocess(image_tensor).unsqueeze(dim=0)
-        input_images = image_tensor.unsqueeze(dim=0).cuda()
+        input_size = tuple(image_tensor.shape[1:3])
+        input_images = transform.preprocess(image_tensor).unsqueeze(dim=0).cuda()
 
         orig_imgs_small = F.interpolate(
             input_images, (Idim, Idim), mode="bilinear", align_corners=True
         )
         dense_embeddings = self.prompt_encoder.forward(orig_imgs_small)
+        with torch.no_grad():
+            mask = sam_call(input_images, self.sam, dense_embeddings)
 
-        mask = sam_call(input_images, self.sam, dense_embeddings)
-
-        mask = F.interpolate(mask, original_size, mode="bilinear", align_corners=True)
+        mask = self.sam.postprocess_masks(
+            mask, input_size=input_size, original_size=original_size
+        )
         mask = mask.squeeze().cpu().numpy()
         mask = (mask - mask.min()) / (mask.max() - mask.min())
         mask = (255 * mask).astype(np.uint8)
@@ -175,7 +152,7 @@ class AutoSamModel(BaseModel[SAMBatch]):
     def segment_image_from_file(self, image_path: str):
         import cv2
 
-        image = cv2.imread(image_path)
+        image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
         return self.segment_image(image)
 
     def segment_and_write_image_from_file(
@@ -203,7 +180,7 @@ class AutoSamModel(BaseModel[SAMBatch]):
             image, 1 - mask_opacity, overlay, mask_opacity, 0
         )
 
-        cv2.imwrite(output_path, output_image)
+        cv2.imwrite(output_path, cv2.cvtColor(output_image, cv2.COLOR_RGB2BGR))
 
 
 def compute_dice_loss(y_true, y_pred, smooth=1):
@@ -255,9 +232,7 @@ def norm_batch(x):
 
 def sam_call(batched_input, sam, dense_embeddings):
     with torch.no_grad():
-        input_images = torch.stack(
-            [sam.preprocess(x["image"]) for x in batched_input], dim=0
-        )
+        input_images = torch.stack([sam.preprocess(x) for x in batched_input], dim=0)
         image_embeddings = sam.image_encoder(input_images)
         sparse_embeddings_none, dense_embeddings_none = sam.prompt_encoder(
             points=None, boxes=None, masks=None
