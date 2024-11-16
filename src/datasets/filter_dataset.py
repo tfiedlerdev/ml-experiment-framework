@@ -21,7 +21,6 @@ from torchvision import transforms
 class FilterFileReference:
     img_path: str
     label: int
-    test: bool
 
 
 @dataclass
@@ -37,8 +36,9 @@ class FilterBatch(Batch):
 class FilterDatasetArgs(BaseModel):
     """Define arguments for the dataset here, i.e. preprocessing related stuff etc"""
 
-    train_percentage: float = 0.8
-    val_percentage: float = 0.2
+    train_percentage: float = 0.75
+    val_percentage: float = 0.15
+    test_percentage: float = 0.1
 
 
 class FilterDataset(BaseDataset):
@@ -89,23 +89,28 @@ class FilterDataset(BaseDataset):
         return collate
 
     def get_split(self, split: Literal["train", "val", "test"]) -> Self:
-        if split != "test":
-            train_val_samples = [sample for sample in self.samples if not sample.test]
-            samples = (
-                train_val_samples[
-                    : floor(len(train_val_samples) * self.config.train_percentage)
-                ]
-                if split == "train"
-                else self.samples[
-                    floor(len(train_val_samples) * self.config.train_percentage) :
-                ]
-            )
-        else:
-            samples = [sample for sample in self.samples if sample.test]
+        train_start_idx = 0
+        val_start_idx = floor(len(self.samples) * self.config.train_percentage)
+        test_start_idx = floor(
+            len(self.samples)
+            * (self.config.train_percentage + self.config.val_percentage)
+        )
+
+        start_idx = (
+            train_start_idx
+            if split == "train"
+            else val_start_idx if split == "val" else test_start_idx
+        )
+        end_idx = (
+            val_start_idx
+            if split == "train"
+            else test_start_idx if split == "val" else len(self.samples)
+        )
+
         return self.__class__(
             self.config,
             self.yaml_config,
-            samples,
+            self.samples[start_idx:end_idx],
         )
 
     def load_data(self) -> list[FilterFileReference]:
@@ -113,36 +118,21 @@ class FilterDataset(BaseDataset):
 
         good_sample_filepath = os.path.join(dir, "good.txt")
         bad_sample_filepath = os.path.join(dir, "bad.txt")
-        test_sample_filepath = os.path.join(dir, "good_biobank.txt")
 
-        train_val_samples = []
-        test_file_samples = []
+        samples = []
 
-        with open(good_sample_filepath, "r") as f:
-            sample_lines = f.readlines()
+        for i, path in enumerate([bad_sample_filepath, good_sample_filepath]):
+            with open(path, "r") as f:
+                sample_lines = f.readlines()
 
-            for line in sample_lines:
-                line = line.strip()
-                train_val_samples.append(FilterFileReference(line, 1, False))
-
-        with open(bad_sample_filepath, "r") as f:
-            sample_lines = f.readlines()
-
-            for i, line in enumerate(sample_lines):
-                line = line.strip()
-                is_test = i > len(sample_lines) - 20
-                if is_test:
-                    test_file_samples.append(FilterFileReference(line, 0, True))
-                else:
-                    train_val_samples.append(FilterFileReference(line, 0, False))
-
-        with open(test_sample_filepath, "r") as f:
-            sample_lines = f.readlines()
-
-            for line in sample_lines:
-                line = line.strip()
-                test_file_samples.append(FilterFileReference(line, 1, True))
-
+                for line in sample_lines:
+                    line = line.strip()
+                    samples.append(
+                        FilterFileReference(
+                            line,
+                            i,
+                        )
+                    )
         seed(42)
-        shuffle(train_val_samples)
-        return train_val_samples + test_file_samples
+        shuffle(samples)
+        return samples
