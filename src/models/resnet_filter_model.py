@@ -11,12 +11,15 @@ class ResnetFilterModelArgs(PDBaseModel):
 
 
 class ResnetFilterModel(BaseModel):
+    resnet_version = "resnet18"
+    resnet_output_size = 1000
+
     def __init__(self, config: ResnetFilterModelArgs):
         super().__init__()
         self.resnet = torch.hub.load(
-            "pytorch/vision:v0.10.0", "resnet18", pretrained=True
+            "pytorch/vision:v0.10.0", ResnetFilterModel.resnet_version, pretrained=True
         )
-        self.model = create_fully_connected(1000, 2)
+        self.model = create_fully_connected(ResnetFilterModel.resnet_output_size, 2)
         self.loss = CrossEntropyLoss()
 
     def forward(self, batch: Batch) -> ModelOutput:

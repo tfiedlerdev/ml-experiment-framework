@@ -62,7 +62,7 @@ class ResnetFilterExperiment(BaseExperiment):
         return create_steplr_scheduler(optimizer, self.config)
 
     def get_loss_name(self) -> str:
-        return "bce_loss"
+        return "ce"
 
     def run_after_training(self, trained_model: BaseModel):
         self.model.eval()
@@ -80,8 +80,7 @@ class ResnetFilterExperiment(BaseExperiment):
             self.config,
             self.yaml_config,
             samples=[
-                FilterFileReference(str(p.img_path), 0, True)
-                for p in bio_bank_data.samples
+                FilterFileReference(str(p.img_path), 0) for p in bio_bank_data.samples
             ],
         )
         all_samples_loader = DataLoader(
@@ -104,13 +103,14 @@ class ResnetFilterExperiment(BaseExperiment):
                     pred = preds[i]
                     prob = outputs.logits[i].softmax(0)
 
-                    predictions_with_probs.append((filepath, prob[0].item(), prob[1].item(), pred.item()))
-        
+                    predictions_with_probs.append(
+                        (filepath, prob[0].item(), prob[1].item(), pred.item())
+                    )
+
         with open(f"{self.results_dir}/ukbiobank/predictions.csv", "w") as f:
             f.write("file_path,neg_prob,pos_prob,prediction\n")
             for p in predictions_with_probs:
                 f.write(f"{p[0]},{p[1]},{p[2]},{p[3]}\n")
-
 
     def create_cm(self, trained_model, data_loader, output_dir):
         all_preds = []
@@ -164,4 +164,3 @@ class ResnetFilterExperiment(BaseExperiment):
             f.write("file_path,neg_prob,pos_prob\n")
             for fn in fns:
                 f.write(f"{fn[0]},{fn[1]},{fn[2]}\n")
-
