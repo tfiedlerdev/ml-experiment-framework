@@ -80,7 +80,9 @@ class ResnetFilterExperiment(BaseExperiment):
             self.config,
             self.yaml_config,
             samples=[
-                FilterFileReference(str(p.img_path), 0) for p in bio_bank_data.samples
+                # Apply test transform for inference
+                FilterFileReference(str(p.img_path), 0, "test")
+                for p in bio_bank_data.samples
             ],
         )
         all_samples_loader = DataLoader(

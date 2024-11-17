@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from logging import Filter
 from pathlib import Path
 from random import random, seed, shuffle
 
@@ -21,6 +22,7 @@ from torchvision import transforms
 class FilterFileReference:
     img_path: str
     label: int
+    split: Literal["train", "val", "test"]
 
 
 @dataclass
@@ -57,7 +59,24 @@ class FilterDataset(BaseDataset):
 
         image = Image.open(sample.img_path)
 
-        preprocess = transforms.Compose(
+        train_preprocess = transforms.Compose(
+            [
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ColorJitter(
+                    brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1  # type: ignore
+                ),
+                transforms.RandomVerticalFlip(),
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomAffine(90, scale=(0.75, 1.25)),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                ),
+            ]
+        )
+
+        test_preprocess = transforms.Compose(
             [
                 transforms.Resize(256),
                 transforms.CenterCrop(224),
@@ -68,7 +87,11 @@ class FilterDataset(BaseDataset):
             ]
         )
 
-        preprocess_img = preprocess(image)
+        preprocess_img = (
+            test_preprocess(image)
+            if sample.split == "test"
+            else train_preprocess(image)
+        )
 
         return FilterSample(
             input=torch.Tensor(preprocess_img),
@@ -89,28 +112,10 @@ class FilterDataset(BaseDataset):
         return collate
 
     def get_split(self, split: Literal["train", "val", "test"]) -> Self:
-        train_start_idx = 0
-        val_start_idx = floor(len(self.samples) * self.config.train_percentage)
-        test_start_idx = floor(
-            len(self.samples)
-            * (self.config.train_percentage + self.config.val_percentage)
-        )
-
-        start_idx = (
-            train_start_idx
-            if split == "train"
-            else val_start_idx if split == "val" else test_start_idx
-        )
-        end_idx = (
-            val_start_idx
-            if split == "train"
-            else test_start_idx if split == "val" else len(self.samples)
-        )
-
         return self.__class__(
             self.config,
             self.yaml_config,
-            self.samples[start_idx:end_idx],
+            [sample for sample in self.samples if sample.split == split],
         )
 
     def load_data(self) -> list[FilterFileReference]:
@@ -128,11 +133,30 @@ class FilterDataset(BaseDataset):
                 for line in sample_lines:
                     line = line.strip()
                     samples.append(
-                        FilterFileReference(
+                        (
                             line,
                             i,
                         )
                     )
         seed(42)
         shuffle(samples)
-        return samples
+
+        val_start_idx = floor(len(samples) * self.config.train_percentage)
+        test_start_idx = floor(
+            len(samples) * (self.config.train_percentage + self.config.val_percentage)
+        )
+
+        train_samples = [
+            FilterFileReference(img_path, label, "train")
+            for img_path, label in samples[:val_start_idx]
+        ]
+        val_samples = [
+            FilterFileReference(img_path, label, "val")
+            for img_path, label in samples[val_start_idx:test_start_idx]
+        ]
+        test_samples = [
+            FilterFileReference(img_path, label, "test")
+            for img_path, label in samples[test_start_idx:]
+        ]
+
+        return train_samples + val_samples + test_samples
