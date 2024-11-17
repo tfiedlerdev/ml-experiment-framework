@@ -44,6 +44,26 @@
             ]
         },
         {
+            "name": "Run.py filter ukbiobank inference",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/run.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--experiment_id=resnet_filter",
+                "--learning_rate=0.0003",
+                "--batch_size=3",
+                "--epochs=100",
+                "--weight_decay=1e-4",
+                "--early_stopping_patience=10",
+                "--gamma=0.85",
+                "--step_size=5",
+                "--only_test=true",
+                "--from_checkpoint=results/resnet_filter_experiment/2024-11-17_10#47#41/model.pt",
+                "--apply_to_uk_bio_bank=true"
+            ]
+        },
+        {
             "name": "Run.py with drive",
             "type": "debugpy",
             "request": "launch",
