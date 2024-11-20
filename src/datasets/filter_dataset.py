@@ -1,15 +1,10 @@
 from dataclasses import dataclass
-from logging import Filter
-from pathlib import Path
-from random import random, seed, shuffle
+from random import seed, shuffle
 
-from numpy import zeros_like
 from src.datasets.base_dataset import BaseDataset, Batch, Sample
-from src.models.segment_anything.utils.transforms import ResizeLongestSide
-from torchvision.datasets import MNIST
 from pydantic import BaseModel
 from src.args.yaml_config import YamlConfigModel
-from typing import Callable, Literal, Optional
+from typing import Literal, Optional
 from math import floor
 import torch
 from typing_extensions import Self
