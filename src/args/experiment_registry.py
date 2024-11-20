@@ -1,4 +1,5 @@
 from typing import Type
+from src.experiments.aria_experiment import ARIAExperiment
 from src.experiments.resnet_filter_experiment import ResnetFilterExperiment
 from src.experiments.multi_ds_vessel_experiment import MultiDsVesselExperiment
 from src.experiments.hrf_experiment import HrfExperiment
@@ -14,4 +15,5 @@ experiments: dict[str, Type[BaseExperiment]] = {
     "multi_ds_vessel": MultiDsVesselExperiment,
     "hrf": HrfExperiment,
     "resnet_filter": ResnetFilterExperiment,
+    "aria": ARIAExperiment,
 }
