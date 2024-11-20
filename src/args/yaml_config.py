@@ -46,7 +46,7 @@ class YamlConfigModel(BaseModel):
         default="/dhc/dsets/STARE-Vessels", description="The path to the STARE dataset"
     )
     filter_dset_path: str = Field(
-        default="/dhc/dsets/FilterDataset",
+        default="/dhc/dsets/Retina-Filter",
         description="The path to the FilterDataset",
     )
 
