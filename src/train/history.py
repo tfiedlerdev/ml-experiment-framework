@@ -120,11 +120,13 @@ class EpochLosses(NamedTuple):
 class TrainHistory(NamedTuple):
     epochs: list[EpochLosses]
     test_losses: SingleEpochHistory
+    epoch_index_of_test_model: int
 
     def to_dict(self):
         return {
             "epochs": [epoch.to_dict() for epoch in self.epochs],
             "test": self.test_losses.to_dict(),
+            "epoch_index_of_test_model": self.epoch_index_of_test_model,
         }
 
     @classmethod
@@ -177,6 +179,7 @@ class TrainHistory(NamedTuple):
         return cls(
             epochs=epoch_histories,
             test_losses=test_history,
+            epoch_index_of_test_model=data["epoch_index_of_test_model"],
         )
 
     def plot(self, out_path: str):
@@ -224,10 +227,21 @@ class TrainHistory(NamedTuple):
                 linestyle="-",
                 marker=".",
             )
+            test_losses: list = [None] * len(train_losses)
+            test_losses[self.epoch_index_of_test_model] = (
+                self.test_losses.get_average().metrics[metric_key]
+            )
+            ax.plot(
+                test_losses,
+                label=f"{metric_key} (test)",
+                linestyle="-",
+                marker="x",
+                markersize=16,
+            )
             ax.grid()
             ax.set_xlabel("Epochs")
             ax.set_ylabel(metric_key)
-            ax.set_title(f"Train and Validation {metric_key} history")
+            ax.set_title(f"{metric_key} history")
             ax.legend()
             x_ticks = list(range(0, num_epochs, max(1, num_epochs // 10)))
             ax.set_xticks(x_ticks, [str(i) for i in x_ticks])
