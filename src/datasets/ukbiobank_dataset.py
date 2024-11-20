@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from src.datasets.refuge_dataset import get_polyp_transform
 from src.models.segment_anything.utils.transforms import ResizeLongestSide
+from src.util.image_util import calculate_rgb_mean_std
 
 
 class UkBiobankDatasetArgs(BaseModel):
@@ -58,7 +59,13 @@ class UkBiobankDataset(BaseDataset):
         self.yaml_config = yaml_config
         self.with_masks = with_masks
         self.samples = self.load_data() if samples is None else samples
-        self.sam_trans = ResizeLongestSide(image_enc_img_size)
+        pixel_mean, pixel_std = calculate_rgb_mean_std(
+            [str(s.img_path) for s in self.samples],
+            os.path.join(yaml_config.cache_dir, "ukbiobank_mean_std.pkl"),
+        )
+        self.sam_trans = ResizeLongestSide(
+            image_enc_img_size, pixel_mean=pixel_mean, pixel_std=pixel_std
+        )
 
     def __getitem__(self, index: int) -> BiobankSample:
         sample = self.samples[index]
@@ -101,7 +108,11 @@ class UkBiobankDataset(BaseDataset):
             original_size = torch.stack([s.original_size for s in samples])
             image_size = torch.stack([s.image_size for s in samples])
             return BiobankBatch(
-                inputs, targets, original_size=original_size, image_size=image_size, file_paths=[s.img_path for s in samples]
+                inputs,
+                targets,
+                original_size=original_size,
+                image_size=image_size,
+                file_paths=[s.img_path for s in samples],
             )
 
         return collate

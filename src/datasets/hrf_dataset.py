@@ -18,11 +18,18 @@ from typing_extensions import Self
 import os
 from PIL import Image
 
+from src.util.image_util import calculate_rgb_mean_std
+
 
 @dataclass
 class HrfSample(Sample):
     original_size: torch.Tensor
     image_size: torch.Tensor
+
+
+@dataclass
+class HrfFileReference(SAMSampleFileReference):
+    split: str
 
 
 class HrfDatasetArgs(BaseModel):
@@ -36,19 +43,25 @@ class HrfDataset(BaseDataset):
         self,
         config: HrfDatasetArgs,
         yaml_config: YamlConfigModel,
-        samples: Optional[list[SAMSampleFileReference]] = None,
+        samples: Optional[list[HrfFileReference]] = None,
         image_enc_img_size=1024,
     ):
         self.yaml_config = yaml_config
         self.config = config
         self.samples = self.load_data() if samples is None else samples
-        self.sam_trans = ResizeLongestSide(image_enc_img_size)
+        pixel_mean, pixel_std = calculate_rgb_mean_std(
+            [s.img_path for s in self.samples],
+            os.path.join(yaml_config.cache_dir, "hrf_mean_std.pkl"),
+        )
+        self.sam_trans = ResizeLongestSide(
+            image_enc_img_size, pixel_mean=pixel_mean, pixel_std=pixel_std
+        )
 
     def __getitem__(self, index: int) -> HrfSample:
         sample = self.samples[index]
         train_transform, test_transform = get_polyp_transform()
 
-        augmentations = train_transform
+        augmentations = train_transform if sample.split == "train" else test_transform
 
         image = self.cv2_loader(sample.img_path, is_mask=False)
         gt = self.cv2_loader(sample.gt_path, is_mask=True)
@@ -86,11 +99,11 @@ class HrfDataset(BaseDataset):
         return collate
 
     def get_split(self, split: Literal["train", "val", "test"]) -> Self:
-        samples = self.samples[0:15] if split == "train" else self.samples[15:20]
+        split_key = "train" if split == "train" else "val"
         return self.__class__(
             self.config,
             self.yaml_config,
-            samples,
+            [s for s in self.samples if s.split == split_key],
         )
 
     def load_data(self):
@@ -115,13 +128,12 @@ class HrfDataset(BaseDataset):
             for subdir in os.listdir(imgs_dir)
             for img_file in os.listdir(Path(imgs_dir) / subdir)
         ]
-
+        # TODO: add test split
         return [
-            SAMSampleFileReference(
-                img_path=img,
-                gt_path=mask,
+            HrfFileReference(
+                img_path=img, gt_path=mask, split="train" if i < 15 else "val"
             )
-            for img, mask in images_and_masks_paths
+            for i, (img, mask) in enumerate(images_and_masks_paths)
         ]
 
     def filter_files(self, old_images, old_gts):

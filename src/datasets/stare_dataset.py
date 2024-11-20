@@ -18,6 +18,8 @@ from typing_extensions import Self
 import os
 from PIL import Image
 
+from src.util.image_util import calculate_rgb_mean_std
+
 
 @dataclass
 class STARESample(Sample):
@@ -47,7 +49,13 @@ class STAREDataset(BaseDataset):
         self.yaml_config = yaml_config
         self.config = config
         self.samples = self.load_data() if samples is None else samples
-        self.sam_trans = ResizeLongestSide(image_enc_img_size)
+        pixel_mean, pixel_std = calculate_rgb_mean_std(
+            [s.img_path for s in self.samples],
+            os.path.join(yaml_config.cache_dir, "stare_mean_std.pkl"),
+        )
+        self.sam_trans = ResizeLongestSide(
+            image_enc_img_size, pixel_mean=pixel_mean, pixel_std=pixel_std
+        )
 
     def __getitem__(self, index: int) -> STARESample:
         sample = self.samples[index]
