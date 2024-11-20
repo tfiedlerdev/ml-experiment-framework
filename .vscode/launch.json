@@ -72,5 +72,26 @@
                 "--only_test=true"
             ]
         },
+        {
+            "name": "Run.py with multi_ds_vessel",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/run.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--experiment_id=multi_ds_vessel",
+                "--sam_model=vit_b",
+                "--learning_rate=0.0003",
+                "--batch_size=3",
+                "--epochs=100",
+                "--weight_decay=1e-4",
+                "--early_stopping_patience=10",
+                "--visualize_n_segmentations=5",
+                "--gamma=0.85",
+                "--step_size=5",
+                "--best_model_metric=IoU",
+                "--minimize_best_model_metric=false"
+            ]
+        },
     ]
 }

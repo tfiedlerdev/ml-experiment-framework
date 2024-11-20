@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 import re
-from src.models.auto_sam_model import SAMBatch
+from src.models.auto_sam_model import SAMBatch, SAMSampleFileReference
 from src.datasets.refuge_dataset import get_polyp_transform
 import src.util.transforms_shir as transforms
 import numpy as np
@@ -26,9 +26,7 @@ class STARESample(Sample):
 
 
 @dataclass
-class STAREFileReference:
-    img_path: str
-    gt_path: str
+class STAREFileReference(SAMSampleFileReference):
     split: str
 
 

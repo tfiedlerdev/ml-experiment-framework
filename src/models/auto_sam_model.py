@@ -8,7 +8,7 @@ from src.models.segment_anything.build_sam import (
     build_sam_vit_l,
 )
 from src.models.base_model import BaseModel, ModelOutput, Loss
-from src.datasets.base_dataset import Batch
+from src.datasets.base_dataset import BaseDataset, Batch
 from src.util.nn_helper import create_fully_connected, ACTIVATION_FUNCTION
 from pydantic import BaseModel as PDBaseModel
 from torch.nn import BCELoss
@@ -49,6 +49,12 @@ sam_model_registry = {
 class SAMBatch(Batch):
     original_size: torch.Tensor
     image_size: torch.Tensor
+
+
+@dataclass
+class SAMSampleFileReference:
+    img_path: str
+    gt_path: str
 
 
 # Source of most of this code: https://github.com/talshaharabany/AutoSAM

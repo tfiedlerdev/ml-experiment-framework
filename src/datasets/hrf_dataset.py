@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 import re
-from src.models.auto_sam_model import SAMBatch
+from src.models.auto_sam_model import SAMBatch, SAMSampleFileReference
 from src.datasets.refuge_dataset import get_polyp_transform
 import src.util.transforms_shir as transforms
 import numpy as np
@@ -25,12 +25,6 @@ class HrfSample(Sample):
     image_size: torch.Tensor
 
 
-@dataclass
-class HrfFileReference:
-    img_path: str
-    gt_path: str
-
-
 class HrfDatasetArgs(BaseModel):
     """Define arguments for the dataset here, i.e. preprocessing related stuff etc"""
 
@@ -42,7 +36,7 @@ class HrfDataset(BaseDataset):
         self,
         config: HrfDatasetArgs,
         yaml_config: YamlConfigModel,
-        samples: Optional[list[HrfFileReference]] = None,
+        samples: Optional[list[SAMSampleFileReference]] = None,
         image_enc_img_size=1024,
     ):
         self.yaml_config = yaml_config
@@ -101,9 +95,9 @@ class HrfDataset(BaseDataset):
 
     def load_data(self):
         sub_dir_abrv = {
-            "diabetic_retinopathy" : "dr",
-            "glaucoma" : "g",
-            "healthy" : "h",
+            "diabetic_retinopathy": "dr",
+            "glaucoma": "g",
+            "healthy": "h",
         }
         imgs_dir = os.path.join(self.yaml_config.hrf_dset_path, "images")
         gts_dir = os.path.join(self.yaml_config.hrf_dset_path, "masks")
@@ -123,7 +117,7 @@ class HrfDataset(BaseDataset):
         ]
 
         return [
-            HrfFileReference(
+            SAMSampleFileReference(
                 img_path=img,
                 gt_path=mask,
             )
