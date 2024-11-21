@@ -107,5 +107,33 @@
                 "--minimize_best_model_metric=false"
             ]
         },
+        {
+            "name": "Run.py with ukbiobank",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/run.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--experiment_id=uk_biobank_experiment",
+                "--sam_model=vit_b",
+                "--learning_rate=0.0003",
+                "--batch_size=3",
+                "--epochs=100",
+                "--weight_decay=1e-4",
+                "--early_stopping_patience=10",
+                "--visualize_n_segmentations=5",
+                "--gamma=0.85",
+                "--step_size=5",
+                "--best_model_metric=IoU",
+                "--minimize_best_model_metric=false",
+                "--prompt_encoder_checkpoint=/dhc/groups/mp2024cl2/results/drive_experiment/2024-11-15_11#24#47/prompt_encoder.pt",
+                "--sam_checkpoint=/dhc/groups/mp2024cl2/sam_vit_b.pth",
+                "--hard_net_cp=/dhc/groups/mp2024cl2/hardnet68.pth",
+                "--image_encoder_lr=0.00005",
+                "--prompt_encoder_lr=0.0003",
+                "--mask_decoder_lr=0.0001",
+                "--use_wandb=true",
+            ]
+        },
     ]
 }

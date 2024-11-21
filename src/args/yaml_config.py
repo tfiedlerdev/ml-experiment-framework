@@ -26,7 +26,7 @@ class YamlConfigModel(BaseModel):
     )
     # TODO: Generate masks and reference here
     ukbiobank_masks_dir: str = Field(
-        default="<placeholder>",
+        default="/dhc/dsets/retina_masks/v0",
         description="Directory where UK Biobank masks are stored",
     )
     refuge_dset_path: str = Field(

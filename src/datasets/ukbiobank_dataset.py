@@ -20,6 +20,7 @@ class UkBiobankDatasetArgs(BaseModel):
     train_percentage: float = 0.8
     val_percentage: float = 0.15
     test_percentage: float = 0.05
+    filter_scores_filepath: str = "/dhc/groups/mp2024cl2/ukbiobank_filters/filter_predictions.csv"
 
 
 @dataclass
@@ -117,11 +118,18 @@ class UkBiobankDataset(BaseDataset):
     def load_data(self) -> list[BiobankSampleReference]:
         sample_folder = Path(self.yaml_config.ukbiobank_data_dir)
         mask_folder = Path(self.yaml_config.ukbiobank_masks_dir)
-        sample_paths = [
-            (sample_folder / path, mask_folder / path if self.with_masks else None)
-            for path in os.listdir(sample_folder)
-            if not Path(path).is_file() and path.endswith(".png")
-        ]
+        filter_scores_filepath = Path(self.config.filter_scores_filepath)
+        
+        selected_samples = []       
+        with open(filter_scores_filepath, "r") as f:
+            filter_scores = f.readlines()
+            for line in filter_scores[1:]:
+                path, neg_prob, pos_prob, prediction = line.strip().split(",")
+                if prediction == "0":
+                    continue
+                selected_samples.append(path)
+                
+        sample_paths = [(path, mask_folder / path.split("/")[-1] if self.with_masks else None) for path in selected_samples if path.endswith(".png")]
 
         train = self.load_data_for_split("train", sample_paths)
         val = self.load_data_for_split("val", sample_paths)
