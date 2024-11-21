@@ -21,7 +21,10 @@ class UkBiobankDatasetArgs(BaseModel):
     train_percentage: float = 0.8
     val_percentage: float = 0.15
     test_percentage: float = 0.05
-    filter_scores_filepath: str = "/dhc/groups/mp2024cl2/ukbiobank_filters/filter_predictions.csv"
+    filter_scores_filepath: str = (
+        "/dhc/groups/mp2024cl2/ukbiobank_filters/filter_predictions.csv"
+    )
+    mask_iteration: int = 0
 
 
 @dataclass
@@ -55,6 +58,7 @@ class UkBiobankDataset(BaseDataset):
         samples: Optional[list[BiobankSampleReference]] = None,
         image_enc_img_size=1024,
         with_masks=False,
+        random_augmentation_for_all_splits=False,
     ):
         self.config = config
         self.yaml_config = yaml_config
@@ -67,12 +71,17 @@ class UkBiobankDataset(BaseDataset):
         self.sam_trans = ResizeLongestSide(
             image_enc_img_size, pixel_mean=pixel_mean, pixel_std=pixel_std
         )
+        self.random_augmentation_for_all_splits = random_augmentation_for_all_splits
 
     def __getitem__(self, index: int) -> BiobankSample:
         sample = self.samples[index]
         train_transform, test_transform = get_polyp_transform()
 
-        augmentations = test_transform if sample.split == "test" else train_transform
+        augmentations = (
+            test_transform
+            if sample.split == "test" and not self.random_augmentation_for_all_splits
+            else train_transform
+        )
         image = self.cv2_loader(sample.img_path, is_mask=False)
         gt = (
             self.cv2_loader(sample.gt_path, is_mask=True)
@@ -128,10 +137,13 @@ class UkBiobankDataset(BaseDataset):
 
     def load_data(self) -> list[BiobankSampleReference]:
         sample_folder = Path(self.yaml_config.ukbiobank_data_dir)
-        mask_folder = Path(self.yaml_config.ukbiobank_masks_dir)
+        mask_folder = (
+            Path(self.yaml_config.ukbiobank_masks_dir)
+            / f"v{self.config.mask_iteration}"
+        )
         filter_scores_filepath = Path(self.config.filter_scores_filepath)
-        
-        selected_samples = []       
+
+        selected_samples = []
         with open(filter_scores_filepath, "r") as f:
             filter_scores = f.readlines()
             for line in filter_scores[1:]:
@@ -139,8 +151,12 @@ class UkBiobankDataset(BaseDataset):
                 if prediction == "0":
                     continue
                 selected_samples.append(path)
-                
-        sample_paths = [(path, mask_folder / path.split("/")[-1] if self.with_masks else None) for path in selected_samples if path.endswith(".png")]
+
+        sample_paths = [
+            (path, mask_folder / path.split("/")[-1] if self.with_masks else None)
+            for path in selected_samples
+            if path.endswith(".png")
+        ]
 
         train = self.load_data_for_split("train", sample_paths)
         val = self.load_data_for_split("val", sample_paths)
