@@ -2,6 +2,10 @@ from typing import Literal, Any, Optional
 from click import prompt
 import torch
 from torch.optim.optimizer import Optimizer
+from src.datasets.joined_retina_dataset import (
+    JoinedRetinaDataset,
+    JoinedRetinaDatasetArgs,
+)
 from src.datasets.ukbiobank_dataset import UkBiobankDataset, UkBiobankDatasetArgs
 from src.models.auto_sam_model import AutoSamModel, AutoSamModelArgs
 from src.experiments.base_experiment import BaseExperiment, BaseExperimentArgs
@@ -16,7 +20,12 @@ from pydantic import Field
 
 
 class UkBiobankExperimentArgs(
-    BaseExperimentArgs, AdamArgs, StepLRArgs, AutoSamModelArgs, UkBiobankDatasetArgs
+    BaseExperimentArgs,
+    AdamArgs,
+    StepLRArgs,
+    AutoSamModelArgs,
+    UkBiobankDatasetArgs,
+    JoinedRetinaDatasetArgs,
 ):
     prompt_encoder_checkpoint: Optional[str] = Field(
         default=None, description="Path to prompt encoder checkpoint"
@@ -39,10 +48,17 @@ class UkBioBankExperiment(BaseExperiment):
     def __init__(self, config: dict[str, Any], yaml_config: YamlConfigModel):
         self.config = UkBiobankExperimentArgs(**config)
 
-        self.ds = UkBiobankDataset(
-            config=self.config, yaml_config=yaml_config, with_masks=True
+        self.biobank = UkBiobankDataset(
+            config=self.config,
+            yaml_config=yaml_config,
+            with_masks=True,
+            random_augmentation_for_all_splits=True,
         )
+        self.joined_retina = JoinedRetinaDataset.from_config(self.config, yaml_config)
         super().__init__(config, yaml_config)
+        assert (
+            self.config.drive_test_equals_val is False
+        ), "drive_test_equals_val is True but should be False, otherwise we leak data"
 
     def get_name(self) -> str:
         return "uk_biobank_experiment"
@@ -50,7 +66,10 @@ class UkBioBankExperiment(BaseExperiment):
     def _create_dataset(
         self, split: Literal["train", "val", "test"] = "train"
     ) -> BaseDataset:
-        return self.ds.get_split(split)
+        if split == "train":
+            return self.biobank
+        else:
+            return self.joined_retina.get_split(split)
 
     def _create_model(self) -> BaseModel:
         model = AutoSamModel(self.config, grad_only_prompt_encoder=False)
@@ -124,7 +143,7 @@ class UkBioBankExperiment(BaseExperiment):
         def predict_visualize(split: Literal["train", "test"]):
             out_dir = os.path.join(self.results_dir, f"{split}_visualizations")
             os.makedirs(out_dir, exist_ok=True)
-            ds = self.ds.get_split(split)
+            ds = self.biobank.get_split(split)
             print(
                 f"\nCreating {self.config.visualize_n_segmentations} {split} segmentations"
             )
