@@ -49,6 +49,10 @@ class YamlConfigModel(BaseModel):
         default="/dhc/dsets/Retina-Filter",
         description="The path to the FilterDataset",
     )
+    aria_dset_path: str = Field(
+        default="/dhc/dsets/ARIA",
+        description="The path to the ARIA dataset",
+    )
 
 
 class YamlConfig:

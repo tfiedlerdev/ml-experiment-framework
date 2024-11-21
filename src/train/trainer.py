@@ -153,6 +153,8 @@ class Trainer:
                 else epoch_hist.get_average().metrics[self.config.best_model_metric]
             )
 
+        best_model_epoch = -1
+
         for epoch in range(self.config.epochs):
             print(f"\nEpoch {epoch + 1}/{self.config.epochs}")
 
@@ -180,6 +182,7 @@ class Trainer:
                     best_model_val_metric = curr_epoch_val_metric
                     torch.save(self.model.state_dict(), best_model_path)
                     print(f"\n\nSaving model checkpoint at {best_model_path}\n")
+                    best_model_epoch = epoch
 
             if (
                 self.config.early_stopping_patience is not None
@@ -214,4 +217,4 @@ class Trainer:
         test_losses = self.evaluate_epoch("test")
         wandb.log(self._get_wandb_metrics(test_losses, "test"))
         print(f"\nTest loss ({self.loss_name}): {test_losses.get_average().loss}")
-        return self.model, TrainHistory(history, test_losses)
+        return self.model, TrainHistory(history, test_losses, best_model_epoch)

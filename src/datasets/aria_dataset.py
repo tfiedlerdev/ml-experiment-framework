@@ -1,3 +1,4 @@
+from ast import Not
 from dataclasses import dataclass
 from pathlib import Path
 import re
@@ -18,50 +19,38 @@ from typing_extensions import Self
 import os
 from PIL import Image
 
-from src.util.image_util import calculate_rgb_mean_std
-
 
 @dataclass
-class STARESample(Sample):
+class ARIASample(Sample):
     original_size: torch.Tensor
     image_size: torch.Tensor
 
 
-@dataclass
-class STAREFileReference(SAMSampleFileReference):
-    split: str
 
-
-class STAREDatasetArgs(BaseModel):
+class ARIADatasetArgs(BaseModel):
     """Define arguments for the dataset here, i.e. preprocessing related stuff etc"""
 
-    annotator: Literal["AdamHoover", "ValentinaKouznetsova"] = "ValentinaKouznetsova"
+    annotator: Literal["BSS", "BDP"] = "BSS"
 
 
-class STAREDataset(BaseDataset):
+class ARIADataset(BaseDataset):
     def __init__(
         self,
-        config: STAREDatasetArgs,
+        config: ARIADatasetArgs,
         yaml_config: YamlConfigModel,
-        samples: Optional[list[STAREFileReference]] = None,
+        samples: Optional[list[SAMSampleFileReference]] = None,
         image_enc_img_size=1024,
     ):
         self.yaml_config = yaml_config
         self.config = config
         self.samples = self.load_data() if samples is None else samples
-        pixel_mean, pixel_std = calculate_rgb_mean_std(
-            [s.img_path for s in self.samples],
-            os.path.join(yaml_config.cache_dir, "stare_mean_std.pkl"),
-        )
-        self.sam_trans = ResizeLongestSide(
-            image_enc_img_size, pixel_mean=pixel_mean, pixel_std=pixel_std
-        )
+        self.sam_trans = ResizeLongestSide(image_enc_img_size)
 
-    def __getitem__(self, index: int) -> STARESample:
+    def __getitem__(self, index: int) -> ARIASample:
         sample = self.samples[index]
         train_transform, test_transform = get_polyp_transform()
 
-        augmentations = train_transform if sample.split == "train" else test_transform
+        augmentations = test_transform
 
         image = self.cv2_loader(sample.img_path, is_mask=False)
         gt = self.cv2_loader(sample.gt_path, is_mask=True)
@@ -76,7 +65,7 @@ class STAREDataset(BaseDataset):
         mask[mask <= 0.5] = 0
         image_size = tuple(img.shape[1:3])
 
-        return STARESample(
+        return ARIASample(
             input=self.sam_trans.preprocess(img),
             target=self.sam_trans.preprocess(mask),
             original_size=torch.Tensor(original_size),
@@ -87,7 +76,7 @@ class STAREDataset(BaseDataset):
         return len(self.samples)
 
     def get_collate_fn(self):  # type: ignore
-        def collate(samples: list[STARESample]):
+        def collate(samples: list[ARIASample]):
             inputs = torch.stack([s.input for s in samples])
             targets = torch.stack([s.target for s in samples])
             original_size = torch.stack([s.original_size for s in samples])
@@ -99,33 +88,26 @@ class STAREDataset(BaseDataset):
         return collate
 
     def get_split(self, split: Literal["train", "val", "test"]) -> Self:
-        return self.__class__(
-            self.config,
-            self.yaml_config,
-            [sample for sample in self.samples if sample.split == split],
-        )
+        raise NotImplementedError("Splitting not implemented for ARIA dataset")
 
     def load_data(self):
-        imgs_dir = os.path.join(self.yaml_config.stare_dset_path, "img")
-        gts_dir = os.path.join(self.yaml_config.stare_dset_path, "masks")
+        imgs_dir = os.path.join(self.yaml_config.aria_dset_path, "images")
+        gts_dir = os.path.join(self.yaml_config.aria_dset_path, "masks")
 
         images_and_masks_paths = [
             (
                 str(Path(imgs_dir) / img_file),
                 str(
-                    Path(gts_dir)
-                    / self.config.annotator
-                    / img_file.replace(
-                        ".", ".ah." if self.config.annotator == "AdamHoover" else ".vk."
-                    )
+                    Path(gts_dir) / f"{img_file.removesuffix('.tif')}_{self.config.annotator}.tif"
+
                 ),
             )
             for img_file in os.listdir(imgs_dir)
         ]
 
         return [
-            STAREFileReference(
-                img_path=img, gt_path=mask, split="train" if i < 15 else "val"
+            SAMSampleFileReference(
+                img_path=img, gt_path=mask, 
             )
             for i, (img, mask) in enumerate(images_and_masks_paths)
         ]
