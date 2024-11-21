@@ -4,3 +4,5 @@ results/**
 config.yaml
 *.code-workspace
 *.pth
+*.sh
+*.out
