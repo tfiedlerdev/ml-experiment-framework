@@ -9,7 +9,7 @@ import cv2
 from src.datasets.base_dataset import BaseDataset, Batch, Sample
 from src.models.segment_anything.utils.transforms import ResizeLongestSide
 from torchvision.datasets import MNIST
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from src.args.yaml_config import YamlConfigModel
 from typing import Callable, Literal, Optional
 from math import floor
@@ -19,6 +19,7 @@ import os
 from PIL import Image
 
 from src.util.image_util import calculate_rgb_mean_std
+from src.util.datatset_helper import suggest_split
 
 
 @dataclass
@@ -35,7 +36,10 @@ class HrfFileReference(SAMSampleFileReference):
 class HrfDatasetArgs(BaseModel):
     """Define arguments for the dataset here, i.e. preprocessing related stuff etc"""
 
-    pass
+    hrf_train_percentage: float = Field(
+        default=0.8,
+        description="Percentage of data to use for training. Other data will be assigned to val and, if enabled, test.",
+    )
 
 
 class HrfDataset(BaseDataset):
@@ -99,11 +103,10 @@ class HrfDataset(BaseDataset):
         return collate
 
     def get_split(self, split: Literal["train", "val", "test"]) -> Self:
-        split_key = "train" if split == "train" else "val"
         return self.__class__(
             self.config,
             self.yaml_config,
-            [s for s in self.samples if s.split == split_key],
+            [s for s in self.samples if s.split == split],
         )
 
     def load_data(self):
@@ -128,10 +131,13 @@ class HrfDataset(BaseDataset):
             for subdir in os.listdir(imgs_dir)
             for img_file in os.listdir(Path(imgs_dir) / subdir)
         ]
-        # TODO: add test split
         return [
             HrfFileReference(
-                img_path=img, gt_path=mask, split="train" if i < 15 else "val"
+                img_path=img,
+                gt_path=mask,
+                split=suggest_split(
+                    i, len(images_and_masks_paths), self.config.hrf_train_percentage
+                ),
             )
             for i, (img, mask) in enumerate(images_and_masks_paths)
         ]

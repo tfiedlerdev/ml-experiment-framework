@@ -9,7 +9,7 @@ import cv2
 from src.datasets.base_dataset import BaseDataset, Batch, Sample
 from src.models.segment_anything.utils.transforms import ResizeLongestSide
 from torchvision.datasets import MNIST
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from src.args.yaml_config import YamlConfigModel
 from typing import Callable, Literal, Optional
 from math import floor
@@ -19,6 +19,7 @@ import os
 from PIL import Image
 
 from src.util.image_util import calculate_rgb_mean_std
+from src.util.datatset_helper import suggest_split
 
 
 @dataclass
@@ -35,7 +36,14 @@ class DriveFileReference(SAMSampleFileReference):
 class DriveDatasetArgs(BaseModel):
     """Define arguments for the dataset here, i.e. preprocessing related stuff etc"""
 
-    pass
+    drive_test_equals_val: bool = Field(
+        default=True,
+        description="Whether the test set should be the same as the val set",
+    )
+    drive_train_percentage: float = Field(
+        default=0.8,
+        description="Percentage of data to use for training. Other data will be assigned to val and, if enabled, test.",
+    )
 
 
 class DriveDataset(BaseDataset):
@@ -99,11 +107,12 @@ class DriveDataset(BaseDataset):
         return collate
 
     def get_split(self, split: Literal["train", "val", "test"]) -> Self:
-        samples = self.samples[0:15] if split == "train" else self.samples[15:20]
+        if self.config.drive_test_equals_val and split == "test":
+            split = "val"
         return self.__class__(
             self.config,
             self.yaml_config,
-            samples,
+            [s for s in self.samples if s.split == split],
         )
 
     def load_data(self):
@@ -120,7 +129,14 @@ class DriveDataset(BaseDataset):
 
         return [
             DriveFileReference(
-                img_path=img, gt_path=mask, split="train" if i < 15 else "val"
+                img_path=img,
+                gt_path=mask,
+                split=suggest_split(
+                    i,
+                    len(images_and_masks_paths),
+                    self.config.drive_train_percentage,
+                    test_equals_val=self.config.drive_test_equals_val,
+                ),
             )
             for i, (img, mask) in enumerate(images_and_masks_paths)
         ]

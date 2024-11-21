@@ -9,7 +9,7 @@ import cv2
 from src.datasets.base_dataset import BaseDataset, Batch, Sample
 from src.models.segment_anything.utils.transforms import ResizeLongestSide
 from torchvision.datasets import MNIST
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from src.args.yaml_config import YamlConfigModel
 from typing import Callable, Literal, Optional
 from math import floor
@@ -36,7 +36,10 @@ class ChaseDb1FileReference(SAMSampleFileReference):
 class ChaseDb1DatasetArgs(BaseModel):
     """Define arguments for the dataset here, i.e. preprocessing related stuff etc"""
 
-    pass
+    chasedb1_train_percentage: float = Field(
+        default=0.8,
+        description="Percentage of data to use for training. Other data will be assigned to val and, if enabled, test.",
+    )
 
 
 class ChaseDb1Dataset(BaseDataset):
@@ -116,8 +119,13 @@ class ChaseDb1Dataset(BaseDataset):
         imgs = [f for f in os.listdir(dir) if f.endswith(".jpg")]
 
         refs = []
+        train_ratio = self.config.chasedb1_train_percentage
         for i, img_file_name in enumerate(imgs):
-            is_train = i / len(imgs) < 0.8
+            is_train = i / len(imgs) < train_ratio
+            is_val = (
+                i / len(imgs) < train_ratio + (1 - train_ratio) / 2 and not is_train
+            )
+            split = "train" if is_train else "val" if is_val else "test"
             img = str(Path(dir) / img_file_name)
             gt1 = str(Path(dir) / img_file_name.replace(".jpg", "_1stHO.png"))
             gt2 = str(Path(dir) / img_file_name.replace(".jpg", "_2ndHO.png"))
@@ -126,7 +134,7 @@ class ChaseDb1Dataset(BaseDataset):
                     img_path=img,
                     gt_path=gt1,
                     id=img_file_name,
-                    split="train" if is_train else "val",
+                    split=split,
                 )
             )
             refs.append(
@@ -134,7 +142,7 @@ class ChaseDb1Dataset(BaseDataset):
                     img_path=img,
                     gt_path=gt2,
                     id=img_file_name,
-                    split="train" if is_train else "val",
+                    split=split,
                 )
             )
 
