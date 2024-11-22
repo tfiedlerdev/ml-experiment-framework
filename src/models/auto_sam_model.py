@@ -30,8 +30,8 @@ def get_dice_ji(predict, target):
 
 class AutoSamModelArgs(PDBaseModel):
     sam_model: Literal["vit_h", "vit_l", "vit_b"]
-    sam_checkpoint: str = "./sam_vit_b.pth"
-    hard_net_cp: str = "./hardnet68.pth"
+    sam_checkpoint: str = "/dhc/groups/mp2024cl2/sam_vit_b.pth"
+    hard_net_cp: str = "/dhc/groups/mp2024cl2/hardnet68.pth"
     hard_net_arch: int = 68
     depth_wise: bool = False
     Idim: int = 512
