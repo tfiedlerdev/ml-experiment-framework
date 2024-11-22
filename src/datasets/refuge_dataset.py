@@ -5,13 +5,11 @@ from src.models.auto_sam_model import SAMBatch
 import src.util.transforms_shir as transforms
 
 import cv2
-from src.datasets.base_dataset import BaseDataset, Batch, Sample
+from src.datasets.base_dataset import BaseDataset, Sample
 from src.models.segment_anything.utils.transforms import ResizeLongestSide
-from torchvision.datasets import MNIST
 from pydantic import BaseModel
 from src.args.yaml_config import YamlConfigModel
-from typing import Callable, Literal, Optional
-from math import floor
+from typing import Literal, Optional
 import torch
 from typing_extensions import Self
 import os
