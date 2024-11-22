@@ -82,9 +82,9 @@ class UkBiobankDataset(BaseDataset):
             if sample.split == "test" and not self.random_augmentation_for_all_splits
             else train_transform
         )
-        image = self.cv2_loader(sample.img_path, is_mask=False)
+        image = self.cv2_loader(str(sample.img_path), is_mask=False)
         gt = (
-            self.cv2_loader(sample.gt_path, is_mask=True)
+            self.cv2_loader(str(sample.gt_path), is_mask=True)
             if self.with_masks
             else np.zeros_like(image)
         )
@@ -194,7 +194,7 @@ class UkBiobankDataset(BaseDataset):
             for img_path, gt_path in sample_paths[index_offset : index_offset + length]
         ]
 
-    def cv2_loader(self, path, is_mask):
+    def cv2_loader(self, path: str, is_mask: bool):
         if is_mask:
             img = cv2.imread(path, 0)
             img[img > 0] = 1
