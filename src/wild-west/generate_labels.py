@@ -11,14 +11,12 @@ from pathlib import Path
 yaml_config = YamlConfig().config
 # Mask output path
 iteration = 0
-output_path = Path(yaml_config.ukbiobank_data_dir) / f"v{iteration}"
+output_path = Path(yaml_config.ukbiobank_masks_dir) / f"v{iteration}"
 prompt_encoder_checkpoint = "/dhc/groups/mp2024cl2/results/multi_ds_vessel_experiment/2024-11-21_14#26#29/prompt_encoder.pt"
 # Setup configs
 yaml_config = YamlConfig().config
 sam_config = AutoSamModelArgs(
     sam_model="vit_b",
-    sam_checkpoint="/dhc/groups/mp2024cl2/sam_vit_b.pth",
-    hard_net_cp="/dhc/groups/mp2024cl2/hardnet68.pth",
 )
 ds_config = UkBiobankDatasetArgs()
 
