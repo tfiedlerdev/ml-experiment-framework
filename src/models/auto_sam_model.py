@@ -59,7 +59,7 @@ class SAMSampleFileReference:
 
 # Source of most of this code: https://github.com/talshaharabany/AutoSAM
 class AutoSamModel(BaseModel[SAMBatch]):
-    def __init__(self, config: AutoSamModelArgs, grad_only_prompt_encoder=True):
+    def __init__(self, config: AutoSamModelArgs, image_encoder_no_grad=True):
         super().__init__()
         self.sam = sam_model_registry[config.sam_model](
             checkpoint=config.sam_checkpoint
@@ -71,7 +71,7 @@ class AutoSamModel(BaseModel[SAMBatch]):
             hard_net_cp=config.hard_net_cp,
         )
         self.config = config
-        self.grad_only_prompt_encoder = grad_only_prompt_encoder
+        self.image_encoder_no_grad = image_encoder_no_grad
 
     def forward(self, batch: SAMBatch) -> ModelOutput:
         Idim = self.config.Idim
@@ -81,7 +81,7 @@ class AutoSamModel(BaseModel[SAMBatch]):
         dense_embeddings = self.prompt_encoder(orig_imgs_small)
         masks = norm_batch(
             sam_call(
-                batch.input, self.sam, dense_embeddings, self.grad_only_prompt_encoder
+                batch.input, self.sam, dense_embeddings, self.image_encoder_no_grad
             )
         )
 
@@ -241,8 +241,8 @@ def norm_batch(x):
     return x
 
 
-def sam_call(batched_input, sam, dense_embeddings, grad_only_prompt_encoder=True):
-    with torch.set_grad_enabled(not grad_only_prompt_encoder):
+def sam_call(batched_input, sam, dense_embeddings, image_encoder_no_grad=True):
+    with torch.set_grad_enabled(not image_encoder_no_grad):
         input_images = torch.stack([sam.preprocess(x) for x in batched_input], dim=0)
         image_embeddings = sam.image_encoder(input_images)
         sparse_embeddings_none, dense_embeddings_none = sam.prompt_encoder(
