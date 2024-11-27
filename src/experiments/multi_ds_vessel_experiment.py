@@ -29,6 +29,18 @@ class MultiDSVesselExperimentArgs(
     visualize_n_segmentations: int = Field(
         default=3, description="Number of images of test set to segment and visualize"
     )
+    image_encoder_lr: Optional[float] = Field(
+        default=None,
+        description="Learning rate for image encoder, if None image encoder is frozen",
+    )
+    mask_decoder_lr: Optional[float] = Field(
+        default=None,
+        description="Learning rate for mask decoder,  if None image encoder is frozen",
+    )
+    prompt_encoder_lr: Optional[float] = Field(
+        default=None,
+        description="Learning rate for prompt encoder, if None, general learning rate is used",
+    )
 
 
 class MultiDsVesselExperiment(BaseExperiment):
@@ -47,7 +59,8 @@ class MultiDsVesselExperiment(BaseExperiment):
         return self.ds.get_split(split)
 
     def _create_model(self) -> BaseModel:
-        model = AutoSamModel(self.config)
+        image_encoder_no_grad = self.config.image_encoder_lr is None
+        model = AutoSamModel(self.config, image_encoder_no_grad)
         if self.config.prompt_encoder_checkpoint is not None:
             print(
                 f"loading prompt-encoder model from checkpoint {self.config.prompt_encoder_checkpoint}"
@@ -63,7 +76,40 @@ class MultiDsVesselExperiment(BaseExperiment):
         return MultiDSVesselExperimentArgs
 
     def create_optimizer(self) -> Optimizer:
-        return create_adam_optimizer(self.model, self.config)
+        prompt_enc_params: dict = {
+            "params": cast(AutoSamModel, self.model).sam.prompt_encoder.parameters(),
+        }
+        if self.config.prompt_encoder_lr is not None:
+            prompt_enc_params["lr"] = self.config.prompt_encoder_lr
+
+        params = [prompt_enc_params]
+
+        if self.config.image_encoder_lr is not None:
+            params.append(
+                {
+                    "params": cast(
+                        AutoSamModel, self.model
+                    ).sam.image_encoder.parameters(),
+                    "lr": self.config.image_encoder_lr,
+                }
+            )
+
+        if self.config.mask_decoder_lr is not None:
+            params.append(
+                {
+                    "params": cast(
+                        AutoSamModel, self.model
+                    ).sam.mask_decoder.parameters(),
+                    "lr": self.config.mask_decoder_lr,
+                }
+            )
+
+        return torch.optim.Adam(
+            params,
+            lr=self.config.learning_rate,
+            weight_decay=self.config.weight_decay,
+            eps=self.config.eps,
+        )
 
     def create_scheduler(
         self, optimizer: Optimizer
@@ -78,6 +124,10 @@ class MultiDsVesselExperiment(BaseExperiment):
         torch.save(
             model.prompt_encoder.state_dict(),
             os.path.join(self.results_dir, "prompt_encoder.pt"),
+        )
+        torch.save(
+            model.state_dict(),
+            os.path.join(self.results_dir, "model.pt"),
         )
 
     def run_after_training(self, trained_model: BaseModel):
