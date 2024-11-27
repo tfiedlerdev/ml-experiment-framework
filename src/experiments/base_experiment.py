@@ -144,7 +144,9 @@ class BaseExperiment(metaclass=ABCMeta):
                 if test_results is not None:
                     wandb.log(trainer._get_wandb_metrics(test_results, "test"))
                     self.process_test_results(test_results)
-                    with open(os.path.join(self.results_dir, "test_results.json"), "w") as f:
+                    with open(
+                        os.path.join(self.results_dir, "test_results.json"), "w"
+                    ) as f:
                         json.dump(test_results.to_dict(), f, indent=5)
                 self.run_after_training(self.model)
             print(f"Done. Saved results to {self.results_dir}")
