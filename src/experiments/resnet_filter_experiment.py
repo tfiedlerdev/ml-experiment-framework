@@ -124,24 +124,27 @@ class ResnetFilterExperiment(BaseExperiment):
         os.makedirs(output_dir, exist_ok=True)
 
         with torch.no_grad():
-            for i, data in enumerate(data_loader):
-                print(f"processing batch {i}/{len(data_loader)}", end="\r")
+            with open(f"{output_dir}/test_predictions.csv", "w") as f:
+                f.write("file_path,neg_prob,pos_prob,label\n")
+                for i, data in enumerate(data_loader):
+                    print(f"processing batch {i}/{len(data_loader)}", end="\r")
 
-                outputs = trained_model(data.cuda())
-                preds = torch.argmax(outputs.logits, dim=1)
+                    outputs = trained_model(data.cuda())
+                    preds = torch.argmax(outputs.logits, dim=1)
 
-                for i, filepath in enumerate(data.file_paths):
-                    pred = preds[i]
-                    prob = outputs.logits[i].softmax(0)
-                    label = data.target[i].argmax(0)
+                    for i, filepath in enumerate(data.file_paths):
+                        pred = preds[i]
+                        prob = outputs.logits[i].softmax(0)
+                        label = data.target[i].argmax(0)
 
-                    if pred == 1 and label == 0:
-                        fps.append((filepath, prob[0].item(), prob[1].item()))
-                    elif pred == 0 and label == 1:
-                        fns.append((filepath, prob[0].item(), prob[1].item()))
+                        f.write(f"{filepath},{prob[0].item()},{prob[1].item()},{label}\n")
+                        if pred == 1 and label == 0:
+                            fps.append((filepath, prob[0].item(), prob[1].item()))
+                        elif pred == 0 and label == 1:
+                            fns.append((filepath, prob[0].item(), prob[1].item()))
 
-                all_preds.extend(preds.cpu().numpy())
-                all_labels.extend(data.target.argmax(1).cpu().numpy())
+                    all_preds.extend(preds.cpu().numpy())
+                    all_labels.extend(data.target.argmax(1).cpu().numpy())
 
         cm = confusion_matrix(all_labels, all_preds)
         plt.figure(figsize=(10, 7))
@@ -157,7 +160,7 @@ class ResnetFilterExperiment(BaseExperiment):
         plt.ylabel("True")
         plt.title(f"Confusion Matrix, {len(all_preds)} total samples")
         plt.savefig(f"{output_dir}/confusion_matrix.png")
-
+        
         with open(f"{output_dir}/fps.csv", "w") as f:
             f.write("file_path,neg_prob,pos_prob\n")
             for fp in fps:
