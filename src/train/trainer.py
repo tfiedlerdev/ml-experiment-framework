@@ -2,6 +2,7 @@ import os
 import uuid
 from typing import Literal, cast
 
+from matplotlib.pyplot import sca
 import numpy as np
 import torch
 import wandb
@@ -39,38 +40,39 @@ class Trainer:
 
     def _train_epoch(self, data_loader: DataLoader):
         self.model.train()
+        scaler = torch.GradScaler(device=self.device)
         evaluator = self.experiment.create_evaluator("train")
 
         for i, batch in enumerate(data_loader):
             batch = cast(Batch, batch).to(self.device)
-
             self.optimizer.zero_grad()
-
-            if self.config.whiteNoiseSD > 0:
-                input = batch.input
-                noised_input = input + (
-                    torch.randn(input.shape, device=input.device)
-                    * self.config.whiteNoiseSD
-                )
-                batch.input = noised_input
-
-            if self.config.constantOffsetSD > 0:
-                input = batch.input
-                offset_input = input + (
-                    torch.randn(
-                        [input.shape[0], 1, input.shape[2]], device=input.device
+            with torch.autocast(device_type=self.device, dtype=torch.float16):
+                if self.config.whiteNoiseSD > 0:
+                    input = batch.input
+                    noised_input = input + (
+                        torch.randn(input.shape, device=input.device)
+                        * self.config.whiteNoiseSD
                     )
-                    * self.config.constantOffsetSD
-                )
-                batch.input = offset_input
+                    batch.input = noised_input
 
-            # Make predictions for this batch
-            with torch.enable_grad():
-                # calculate gradient for whole model (but only optimize parts)
-                outputs = self.model.forward(batch)
+                if self.config.constantOffsetSD > 0:
+                    input = batch.input
+                    offset_input = input + (
+                        torch.randn(
+                            [input.shape[0], 1, input.shape[2]], device=input.device
+                        )
+                        * self.config.constantOffsetSD
+                    )
+                    batch.input = offset_input
+
+                # Make predictions for this batch
+                with torch.enable_grad():
+                    # calculate gradient for whole model (but only optimize parts)
+                    outputs = self.model.forward(batch)
 
             loss = self.model.compute_loss(outputs, batch)
-            loss.loss.backward()
+
+            scaler.scale(loss.loss).backward()
 
             if self.config.gradient_clipping is not None:
                 torch.nn.utils.clip_grad_norm_(  # type: ignore
@@ -78,7 +80,9 @@ class Trainer:
                 )
 
             # Adjust learning weights
-            self.optimizer.step()
+            scaler.step(self.optimizer)
+            scaler.update()
+
             evaluator.track_batch(outputs, loss, batch)
             if (
                 i % self.config.log_every_n_batches
