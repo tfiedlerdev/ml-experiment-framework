@@ -6,6 +6,7 @@ from src.datasets.joined_retina_dataset import (
     JoinedRetinaDataset,
     JoinedRetinaDatasetArgs,
 )
+from torch.utils.data import DataLoader
 from src.datasets.ukbiobank_dataset import UkBiobankDataset, UkBiobankDatasetArgs
 from src.models.auto_sam_model import AutoSamModel, AutoSamModelArgs
 from src.experiments.base_experiment import BaseExperiment, BaseExperimentArgs
@@ -42,6 +43,12 @@ class SelfLearningExperimentArgs(
     teacher_student_update_ratio: float = Field(
         default=0.2, description="Ratio of teacher to student update"
     )
+    ema_decay_origin: float = Field(
+        default=0.999, description="Exponential moving average decay"
+    )
+    secondary_batch_size: int = Field(
+        default=16, description="Batch size for unlabeled data"
+    )
 
 
 class SelfLearningExperiment(BaseExperiment):
@@ -57,6 +64,13 @@ class SelfLearningExperiment(BaseExperiment):
             random_augmentation_for_all_splits=True,
         )
         super().__init__(config, yaml_config)
+
+        self.unlabeled_loader = DataLoader(
+            self.ds_wo_labels,
+            batch_size=self.config.secondary_batch_size,
+            shuffle=True,
+            collate_fn=self.ds_wo_labels.get_collate_fn(),
+        )
 
         # Setting up student model
         # Same architecture, same initial checkpoint
@@ -79,10 +93,7 @@ class SelfLearningExperiment(BaseExperiment):
     def _create_dataset(
         self, split: Literal["train", "val", "test"] = "train"
     ) -> BaseDataset:
-        if split == "train":
-            return self.ds_wo_labels.get_split(split)
-        else:
-            return self.ds_w_labels.get_split(split)
+        return self.ds_w_labels.get_split(split)
 
     def _create_model(self) -> BaseModel:
         model = AutoSamModel(self.config, image_encoder_no_grad=False)

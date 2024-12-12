@@ -7,6 +7,7 @@ import torch
 import wandb
 from torch.utils.data import DataLoader
 
+from src.models.base_model import Loss, ModelOutput
 from src.experiments.self_learning_experiment import SelfLearningExperiment
 from src.datasets.base_dataset import Batch
 from src.experiments.base_experiment import BaseExperiment
@@ -17,75 +18,110 @@ from src.train.trainer import Trainer
 
 class SelfTrainer(Trainer):
     def __init__(self, experiment: SelfLearningExperiment):
-        self.cfg = experiment.config
         super().__init__(experiment)
-        self.student_model = experiment.student_model
+        self.experiment = cast(SelfLearningExperiment, experiment)
 
-    def _train_epoch(self, data_loader: DataLoader):
+        # Disable grad for teacher model
+        for p in self.model.parameters():
+            p.requires_grad = False
+
+    def _update_ema(self, i_iter: int):
+        ema_decay = min(
+            1 - 1 / (i_iter + 1),
+            self.experiment.config.ema_decay_origin,
+        )
+        for t_params, s_params in zip(
+            self.model.parameters(), self.experiment.student_model.parameters()
+        ):
+            t_params.data = ema_decay * t_params.data + (1 - ema_decay) * s_params.data
+
+    def _backward_batch_student(self, batch: Batch):
+        self.optimizer.zero_grad()
+
+        if self.config.whiteNoiseSD > 0:
+            input = batch.input
+            noised_input = input + (
+                torch.randn(input.shape, device=input.device) * self.config.whiteNoiseSD
+            )
+            batch.input = noised_input
+
+        if self.config.constantOffsetSD > 0:
+            input = batch.input
+            offset_input = input + (
+                torch.randn([input.shape[0], 1, input.shape[2]], device=input.device)
+                * self.config.constantOffsetSD
+            )
+            batch.input = offset_input
+
+        # Make predictions for this batch
+        with torch.enable_grad():
+            # calculate gradient for whole model (but only optimize parts)
+            outputs = self.experiment.student_model.forward(batch)
+
+        loss = self.experiment.student_model.compute_loss(outputs, batch)
+        loss.loss.backward()
+
+        if self.config.gradient_clipping is not None:
+            torch.nn.utils.clip_grad_norm_(  # type: ignore
+                self.experiment.student_model.parameters(),
+                self.config.gradient_clipping,
+            )
+
+        # Adjust learning weights
+        self.optimizer.step()
+        return outputs, loss
+
+    def _self_learning_log_intermediate(
+        self,
+        batch: int,
+        n_batches: int,
+        evaluator: Evaluator,
+        unlabeled_evaluator: Evaluator,
+    ):
+        loss = evaluator.get_latest_loss()
+        running = evaluator.get_running_loss()
+        unlabeled_loss = unlabeled_evaluator.get_latest_loss()
+        unlabeled_running = unlabeled_evaluator.get_running_loss()
+        print(
+            f"Batch {batch + 1}/{n_batches} {self.loss_name}_loss: {loss:.2f} running: {running:.2f}; unlabeled_{self.loss_name}_loss: {unlabeled_loss:.2f} unlabeled_running: {unlabeled_running:.2f}\r",
+            end="",
+        )
+
+    def _self_learning_epoch(self, data_loader: DataLoader, epoch: int):
         self.model.eval()
-        self.student_model.train()
+        self.experiment.student_model.train()
         evaluator = self.experiment.create_evaluator("train")
+        unlabeled_evaluator = self.experiment.create_evaluator("train")
+        iter_unlabeled = iter(self.experiment.unlabeled_loader)
 
         for i, batch in enumerate(data_loader):
+            iteration = epoch * len(data_loader) + i
             batch = cast(Batch, batch).to(self.device)
+            unlabeled_batch = next(iter_unlabeled).to(self.device)
 
             # Create pseudo labels for unlabeled data
             # TODO: Input is already augmented here
             # Does input augmentation reduce the quality of the pseudo labels?
             with torch.no_grad():
-                batch.target = self.model.forward(batch).logits
+                unlabeled_batch.target = self.model.forward(unlabeled_batch).logits
 
-            self.optimizer.zero_grad()
-
-            if self.config.whiteNoiseSD > 0:
-                input = batch.input
-                noised_input = input + (
-                    torch.randn(input.shape, device=input.device)
-                    * self.config.whiteNoiseSD
-                )
-                batch.input = noised_input
-
-            if self.config.constantOffsetSD > 0:
-                input = batch.input
-                offset_input = input + (
-                    torch.randn(
-                        [input.shape[0], 1, input.shape[2]], device=input.device
-                    )
-                    * self.config.constantOffsetSD
-                )
-                batch.input = offset_input
-
-            # Make predictions for this batch
-            with torch.enable_grad():
-                # calculate gradient for whole model (but only optimize parts)
-                outputs = self.student_model.forward(batch)
-
-            loss = self.student_model.compute_loss(outputs, batch)
-            loss.loss.backward()
-
-            if self.config.gradient_clipping is not None:
-                torch.nn.utils.clip_grad_norm_(  # type: ignore
-                    self.student_model.parameters(), self.config.gradient_clipping
-                )
+            sup_outputs, sup_loss = self._backward_batch_student(batch)
+            unsup_outputs, unsup_loss = self._backward_batch_student(unlabeled_batch)
 
             # Adjust weights of teacher model
             with torch.no_grad():  # Disable gradient tracking
-                for teacher_param, student_param in zip(
-                    self.model.parameters(), self.student_model.parameters()
-                ):
-                    teacher_param.data = (
-                        (1 - self.cfg.teacher_student_update_ratio) * teacher_param.data
-                        + self.cfg.teacher_student_update_ratio * student_param.data
-                    )
+                self._update_ema(iteration)
 
-            # Adjust learning weights
-            self.optimizer.step()
-            evaluator.track_batch(outputs, loss, batch)
+            evaluator.track_batch(sup_outputs, sup_loss, batch)
+            unlabeled_evaluator.track_batch(unsup_outputs, unsup_loss, unlabeled_batch)
+
             if (
                 i % self.config.log_every_n_batches
                 == self.config.log_every_n_batches - 1
             ):
-                self._log_intermediate(i, len(self.dataloader_train), evaluator)
+                self._self_learning_log_intermediate(
+                    i, len(self.dataloader_train), evaluator, unlabeled_evaluator
+                )
         results = evaluator.evaluate()
         evaluator.clean_up()
         return results
@@ -119,7 +155,7 @@ class SelfTrainer(Trainer):
         for epoch in range(self.config.epochs):
             print(f"\nEpoch {epoch + 1}/{self.config.epochs}")
 
-            train_losses = self._train_epoch(self.dataloader_train)
+            train_losses = self._self_learning_epoch(self.dataloader_train, epoch)
             val_losses = self.evaluate_epoch("val")
             self.scheduler.step()
 
