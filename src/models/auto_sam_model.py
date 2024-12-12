@@ -12,7 +12,7 @@ from src.models.segment_anything.build_sam import (
 from src.models.base_model import BaseModel, ModelOutput, Loss
 from src.datasets.base_dataset import Batch
 from pydantic import BaseModel as PDBaseModel
-from torch.nn import BCELoss
+from torch.nn import BCEWithLogitsLoss as BCELoss
 from src.models.auto_sam_prompt_encoder.model_single import ModelEmb
 from torch.nn import functional as F
 import numpy as np
