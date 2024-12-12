@@ -5,15 +5,12 @@ from src.datasets.joined_retina_dataset import (
     JoinedRetinaDataset,
     JoinedRetinaDatasetArgs,
 )
-from src.datasets.chasedb1_dataset import ChaseDb1Dataset, ChaseDb1DatasetArgs
-from src.datasets.drive_dataset import DriveDataset, DriveDatasetArgs
-from src.datasets.refuge_dataset import RefugeDataset, RefugeDatasetArgs
 from src.models.auto_sam_model import AutoSamModel, AutoSamModelArgs
 from src.experiments.base_experiment import BaseExperiment, BaseExperimentArgs
 from src.models.base_model import BaseModel
 from src.args.yaml_config import YamlConfigModel
-from src.datasets.base_dataset import BaseDataset, JoinedDataset
-from src.optimizers.adam import create_adam_optimizer, AdamArgs
+from src.datasets.base_dataset import BaseDataset
+from src.optimizers.adam import AdamArgs
 from src.schedulers.step_lr import StepLRArgs, create_steplr_scheduler
 from typing import cast
 import os
