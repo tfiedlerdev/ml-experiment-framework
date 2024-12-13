@@ -24,7 +24,6 @@ class UkBiobankExperimentArgs(
     AdamArgs,
     StepLRArgs,
     AutoSamModelArgs,
-    UkBiobankDatasetArgs,
     JoinedRetinaDatasetArgs,
 ):
     prompt_encoder_checkpoint: Optional[str] = Field(
@@ -42,17 +41,28 @@ class UkBiobankExperimentArgs(
     prompt_encoder_lr: Optional[float] = Field(
         default=None, description="Learning rate for prompt encoder"
     )
+    mask_iteration: int = 0
+    augment_train: bool = True
+    filter_scores_filepath: str = (
+        "/dhc/groups/mp2024cl2/ukbiobank_filters/filter_predictions.csv"
+    )
 
 
 class UkBioBankExperiment(BaseExperiment):
     def __init__(self, config: dict[str, Any], yaml_config: YamlConfigModel):
         self.config = UkBiobankExperimentArgs(**config)
-
+        biobank_config = UkBiobankDatasetArgs(
+            mask_iteration=self.config.mask_iteration,
+            train_percentage=1.0,
+            val_percentage=0.0,
+            test_percentage=0.0,
+            augment_train=self.config.augment_train,
+            filter_scores_filepath=self.config.filter_scores_filepath,
+        )
         self.biobank = UkBiobankDataset(
-            config=self.config,
+            config=biobank_config,
             yaml_config=yaml_config,
             with_masks=True,
-            random_augmentation_for_all_splits=True,
         )
         self.joined_retina = JoinedRetinaDataset.from_config(self.config, yaml_config)
         super().__init__(config, yaml_config)
@@ -65,14 +75,14 @@ class UkBioBankExperiment(BaseExperiment):
 
     def _create_dataset(
         self, split: Literal["train", "val", "test"] = "train"
-    ) -> BaseDataset:
+    ) -> JoinedRetinaDataset | UkBiobankDataset:
         if split == "train":
             return self.biobank
         else:
             return self.joined_retina.get_split(split)
 
     def _create_model(self) -> BaseModel:
-        model = AutoSamModel(self.config, grad_only_prompt_encoder=False)
+        model = AutoSamModel(self.config, image_encoder_no_grad=False)
         if self.config.prompt_encoder_checkpoint is not None:
             print(
                 f"loading prompt-encoder model from checkpoint {self.config.prompt_encoder_checkpoint}"
@@ -143,17 +153,21 @@ class UkBioBankExperiment(BaseExperiment):
         def predict_visualize(split: Literal["train", "test"]):
             out_dir = os.path.join(self.results_dir, f"{split}_visualizations")
             os.makedirs(out_dir, exist_ok=True)
-            ds = self.biobank.get_split(split)
+            ds = self._create_dataset(split)
             print(
                 f"\nCreating {self.config.visualize_n_segmentations} {split} segmentations"
             )
-            for i in range(min(len(ds), self.config.visualize_n_segmentations)):
-                sample = ds.samples[i]
+
+            file_refs = ds.get_file_refs()
+            for i in range(min(len(file_refs), self.config.visualize_n_segmentations)):
+                sample = file_refs[i]
                 out_path = os.path.join(out_dir, f"{i}.png")
                 model.segment_and_write_image_from_file(
                     str(sample.img_path),
                     out_path,
-                    gts_path=str(sample.gt_path),
+                    gts_path=(
+                        str(sample.gt_path) if sample.gt_path is not None else None
+                    ),
                 )
                 print(
                     f"{i+1}/{self.config.visualize_n_segmentations} {split} segmentations created\r",

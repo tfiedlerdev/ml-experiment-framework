@@ -12,9 +12,8 @@ from src.args.yaml_config import YamlConfigModel
 from src.datasets.base_dataset import BaseDataset, Batch, Sample
 from pydantic import BaseModel
 
-from src.datasets.refuge_dataset import get_polyp_transform
+from src.util.polyp_transform import get_polyp_transform
 from src.models.segment_anything.utils.transforms import ResizeLongestSide
-from src.util.image_util import calculate_rgb_mean_std
 
 
 class UkBiobankDatasetArgs(BaseModel):
@@ -25,6 +24,7 @@ class UkBiobankDatasetArgs(BaseModel):
         "/dhc/groups/mp2024cl2/ukbiobank_filters/filter_predictions.csv"
     )
     mask_iteration: int = 0
+    augment_train: bool = True
 
 
 @dataclass
@@ -40,6 +40,7 @@ class BiobankSample(Sample):
     original_size: torch.Tensor
     image_size: torch.Tensor
     img_path: Path
+    gt_path: Path | None
 
 
 @dataclass
@@ -47,6 +48,7 @@ class BiobankBatch(Batch):
     original_size: torch.Tensor
     image_size: torch.Tensor
     file_paths: list[Path]
+    gt_paths: list[Path | None]
 
 
 class UkBiobankDataset(BaseDataset):
@@ -58,33 +60,47 @@ class UkBiobankDataset(BaseDataset):
         samples: Optional[list[BiobankSampleReference]] = None,
         image_enc_img_size=1024,
         with_masks=False,
-        random_augmentation_for_all_splits=False,
     ):
         self.config = config
         self.yaml_config = yaml_config
         self.with_masks = with_masks
         self.samples = self.load_data() if samples is None else samples
-        pixel_mean, pixel_std = calculate_rgb_mean_std(
-            [str(s.img_path) for s in self.samples],
-            os.path.join(yaml_config.cache_dir, "ukbiobank_mean_std.pkl"),
+        pixel_mean, pixel_std = (
+            self.yaml_config.fundus_pixel_mean,
+            self.yaml_config.fundus_pixel_std,
         )
         self.sam_trans = ResizeLongestSide(
-            image_enc_img_size, pixel_mean=pixel_mean, pixel_std=pixel_std
+            image_enc_img_size,
+            pixel_mean=pixel_mean,
+            pixel_std=pixel_std,
         )
-        self.random_augmentation_for_all_splits = random_augmentation_for_all_splits
+        total_percentage = (
+            self.config.train_percentage
+            + self.config.val_percentage
+            + self.config.test_percentage
+        )
+        assert (
+            total_percentage <= 1.0
+        ), f"train + val + test percantages > 1 (it is {total_percentage})"
+
+    def get_file_refs(self) -> list[BiobankSampleReference]:
+        return self.samples
 
     def __getitem__(self, index: int) -> BiobankSample:
         sample = self.samples[index]
+        return self.get_sample_from_file(sample)
+
+    def get_sample_from_file(self, file_ref: BiobankSampleReference):
         train_transform, test_transform = get_polyp_transform()
 
         augmentations = (
             test_transform
-            if sample.split == "test" and not self.random_augmentation_for_all_splits
+            if file_ref.split == "test" or not self.config.augment_train
             else train_transform
         )
-        image = self.cv2_loader(str(sample.img_path), is_mask=False)
+        image = self.cv2_loader(str(file_ref.img_path), is_mask=False)
         gt = (
-            self.cv2_loader(str(sample.gt_path), is_mask=True)
+            self.cv2_loader(str(file_ref.gt_path), is_mask=True)
             if self.with_masks
             else np.zeros_like(image)
         )
@@ -101,11 +117,12 @@ class UkBiobankDataset(BaseDataset):
 
         return BiobankSample(
             input=self.sam_trans.preprocess(img),
-            target=mask,
+            target=self.sam_trans.preprocess(mask),
             original_size=torch.Tensor(original_size),
             image_size=torch.Tensor(image_size),
-            split=sample.split,
-            img_path=sample.img_path,
+            split=file_ref.split,
+            img_path=file_ref.img_path,
+            gt_path=file_ref.gt_path,
         )
 
     def __len__(self):
@@ -123,6 +140,7 @@ class UkBiobankDataset(BaseDataset):
                 original_size=original_size,
                 image_size=image_size,
                 file_paths=[s.img_path for s in samples],
+                gt_paths=[s.gt_path for s in samples],
             )
 
         return collate

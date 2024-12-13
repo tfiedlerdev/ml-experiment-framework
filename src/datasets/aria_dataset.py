@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import re
 from src.models.auto_sam_model import SAMBatch, SAMSampleFileReference
-from src.datasets.refuge_dataset import get_polyp_transform
+from src.util.polyp_transform import get_polyp_transform
 import src.util.transforms_shir as transforms
 import numpy as np
 import cv2
@@ -24,7 +24,6 @@ from PIL import Image
 class ARIASample(Sample):
     original_size: torch.Tensor
     image_size: torch.Tensor
-
 
 
 class ARIADatasetArgs(BaseModel):
@@ -98,8 +97,8 @@ class ARIADataset(BaseDataset):
             (
                 str(Path(imgs_dir) / img_file),
                 str(
-                    Path(gts_dir) / f"{img_file.removesuffix('.tif')}_{self.config.annotator}.tif"
-
+                    Path(gts_dir)
+                    / f"{img_file.removesuffix('.tif')}_{self.config.annotator}.tif"
                 ),
             )
             for img_file in os.listdir(imgs_dir)
@@ -107,7 +106,8 @@ class ARIADataset(BaseDataset):
 
         return [
             SAMSampleFileReference(
-                img_path=img, gt_path=mask, 
+                img_path=img,
+                gt_path=mask,
             )
             for i, (img, mask) in enumerate(images_and_masks_paths)
         ]

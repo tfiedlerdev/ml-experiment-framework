@@ -61,6 +61,7 @@ class BaseExperimentArgs(PDBaseModel):
     )
     results_subdir_name: Optional[str] = None
     use_cuda: bool = True
+    amp: bool = Field(default=False, description="Use automatic mixed precision")
 
 
 class BaseExperiment(metaclass=ABCMeta):
@@ -94,6 +95,7 @@ class BaseExperiment(metaclass=ABCMeta):
         with open(os.path.join(self.results_dir, "config.json"), "w") as f:
             config_copy = dict(config)
             config_copy["repro_cmd"] = "python " + " ".join(sys.argv)
+            config_copy["yaml_config"] = yaml_config.model_dump()
             json.dump(config_copy, f, indent=5)
         self.model = self._create_model().to(self.get_device())
         self.checkpoint_history = None

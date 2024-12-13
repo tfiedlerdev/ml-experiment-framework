@@ -5,15 +5,12 @@ from src.datasets.joined_retina_dataset import (
     JoinedRetinaDataset,
     JoinedRetinaDatasetArgs,
 )
-from src.datasets.chasedb1_dataset import ChaseDb1Dataset, ChaseDb1DatasetArgs
-from src.datasets.drive_dataset import DriveDataset, DriveDatasetArgs
-from src.datasets.refuge_dataset import RefugeDataset, RefugeDatasetArgs
 from src.models.auto_sam_model import AutoSamModel, AutoSamModelArgs
 from src.experiments.base_experiment import BaseExperiment, BaseExperimentArgs
 from src.models.base_model import BaseModel
 from src.args.yaml_config import YamlConfigModel
-from src.datasets.base_dataset import BaseDataset, JoinedDataset
-from src.optimizers.adam import create_adam_optimizer, AdamArgs
+from src.datasets.base_dataset import BaseDataset
+from src.optimizers.adam import AdamArgs
 from src.schedulers.step_lr import StepLRArgs, create_steplr_scheduler
 from typing import cast
 import os
@@ -77,7 +74,7 @@ class MultiDsVesselExperiment(BaseExperiment):
 
     def create_optimizer(self) -> Optimizer:
         prompt_enc_params: dict = {
-            "params": cast(AutoSamModel, self.model).sam.prompt_encoder.parameters(),
+            "params": cast(AutoSamModel, self.model).prompt_encoder.parameters(),
         }
         if self.config.prompt_encoder_lr is not None:
             prompt_enc_params["lr"] = self.config.prompt_encoder_lr
@@ -94,15 +91,18 @@ class MultiDsVesselExperiment(BaseExperiment):
                 }
             )
 
-        if self.config.mask_decoder_lr is not None:
-            params.append(
-                {
-                    "params": cast(
-                        AutoSamModel, self.model
-                    ).sam.mask_decoder.parameters(),
-                    "lr": self.config.mask_decoder_lr,
-                }
-            )
+        # Always add mask decoder to optimizer to allow for Automatic Mixed Precision to work even when mask decoder isn't trained
+        # See bottom of https://chatgpt.com/share/675ae2c8-fff4-800c-8a5b-cecc352df76a
+        params.append(
+            {
+                "params": cast(AutoSamModel, self.model).sam.mask_decoder.parameters(),
+                "lr": (
+                    self.config.mask_decoder_lr
+                    if self.config.mask_decoder_lr is not None
+                    else 0
+                ),
+            }
+        )
 
         return torch.optim.Adam(
             params,
