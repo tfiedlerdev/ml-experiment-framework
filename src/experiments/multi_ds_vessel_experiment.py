@@ -74,7 +74,7 @@ class MultiDsVesselExperiment(BaseExperiment):
 
     def create_optimizer(self) -> Optimizer:
         prompt_enc_params: dict = {
-            "params": cast(AutoSamModel, self.model).sam.prompt_encoder.parameters(),
+            "params": cast(AutoSamModel, self.model).prompt_encoder.parameters(),
         }
         if self.config.prompt_encoder_lr is not None:
             prompt_enc_params["lr"] = self.config.prompt_encoder_lr
