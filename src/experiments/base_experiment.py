@@ -18,6 +18,7 @@ from src.args.yaml_config import YamlConfigModel
 from src.datasets.base_dataset import BaseDataset
 from src.train.evaluator import Evaluator
 from src.train.history import SingleEpochHistory, TrainHistory
+from src.util.git_util import get_git_info
 
 
 class BaseExperimentArgs(PDBaseModel):
@@ -93,7 +94,10 @@ class BaseExperiment(metaclass=ABCMeta):
 
         os.makedirs(self.results_dir, exist_ok=True)
         with open(os.path.join(self.results_dir, "config.json"), "w") as f:
-            config_copy = dict(config)
+            config_copy: dict = {"args": dict(config)}
+            commit_hash, commit_url = get_git_info()
+            config_copy["git_commit_hash"] = commit_hash
+            config_copy["git_commit_url"] = commit_url
             config_copy["repro_cmd"] = "python " + " ".join(sys.argv)
             config_copy["yaml_config"] = yaml_config.model_dump()
             json.dump(config_copy, f, indent=5)
