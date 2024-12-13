@@ -7,6 +7,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import Tensor
 
 from typing import Optional, Tuple, Type
 
@@ -149,12 +150,11 @@ class Block(nn.Module):
         """
         super().__init__()
         self.norm1 = norm_layer(dim)
-        self.attn = Attention(
+        self.attn = FlashRelativePositionAttention(
             dim,
             num_heads=num_heads,
             qkv_bias=qkv_bias,
             use_rel_pos=use_rel_pos,
-            rel_pos_zero_init=rel_pos_zero_init,
             input_size=input_size if window_size == 0 else (window_size, window_size),
         )
 
@@ -238,6 +238,101 @@ class Attention(nn.Module):
         x = self.proj(x)
 
         return x
+    
+class FlashRelativePositionAttention(nn.Module):
+    """
+    Multi-head Attention block with relative position embeddings,
+    utilizing scaled_dot_product_attention for optimized computation.
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        num_heads: int = 8,
+        qkv_bias: bool = True,
+        use_rel_pos: bool = False,
+        input_size: Optional[tuple] = None,
+    ) -> None:
+        """
+        Args:
+            dim (int): Number of input channels.
+            num_heads (int): Number of attention heads.
+            qkv_bias (bool): If True, add a learnable bias to query, key, value.
+            use_rel_pos (bool): If True, add relative positional embeddings to the attention map.
+            input_size (tuple(int, int) or None): Input resolution for calculating
+                the relative positional parameter size.
+        """
+        super().__init__()
+        self.num_heads = num_heads
+        self.head_dim = dim // num_heads
+        self.use_rel_pos = use_rel_pos
+
+        assert dim % num_heads == 0, "dim must be divisible by num_heads."
+
+        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
+        self.proj = nn.Linear(dim, dim)
+
+        if self.use_rel_pos:
+            assert input_size is not None, "Input size must be provided if using relative positional encoding."
+            h, w = input_size
+            self.rel_pos_h = nn.Parameter(torch.zeros(2 * h - 1, self.head_dim))
+            self.rel_pos_w = nn.Parameter(torch.zeros(2 * w - 1, self.head_dim))
+            nn.init.trunc_normal_(self.rel_pos_h, std=0.02)
+            nn.init.trunc_normal_(self.rel_pos_w, std=0.02)
+
+    def forward(self, x: Tensor) -> Tensor:
+        B, H, W, C = x.shape
+        N = H * W  # Flattened sequence length
+
+        # Compute q, k, v
+        qkv = self.qkv(x).reshape(B, H * W, 3, self.num_heads, self.head_dim)
+        qkv = qkv.permute(2, 0, 3, 1, 4)  # (3, B, num_heads, HW, head_dim)
+        q, k, v = qkv.unbind(0)
+
+        # Compute attention scores with scaled_dot_product_attention
+        attn_mask = None
+        attn_bias = None
+
+        if self.use_rel_pos:
+            # Compute relative positional biases
+            attn_bias = self._get_relative_position_bias(H, W)
+
+        # Apply scaled dot-product attention
+        attn_output = F.scaled_dot_product_attention(
+            q, k, v, attn_mask=attn_mask, dropout_p=0.0
+        )  # (B, num_heads, HW, head_dim)
+
+        # Combine heads and project
+        attn_output = attn_output.transpose(1, 2).reshape(B, H, W, C)
+        output = self.proj(attn_output)
+        return output
+
+    def _get_relative_position_bias(self, H: int, W: int) -> Tensor:
+        """
+        Compute the relative positional bias for the attention map.
+        """
+        rel_h = self._expand_rel_pos(self.rel_pos_h, H)  # (2*H-1, head_dim)
+        rel_w = self._expand_rel_pos(self.rel_pos_w, W)  # (2*W-1, head_dim)
+
+        # Compute biases for all pairs of positions
+        B = rel_h.shape[0]
+        head_dim = rel_h.shape[1]
+
+        # Reshape and expand dimensions for broadcasting
+        rel_h = rel_h.unsqueeze(1).unsqueeze(2)  # (2*H-1, 1, 1, head_dim)
+        rel_w = rel_w.unsqueeze(1).unsqueeze(0)  # (1, 1, 2*W-1, head_dim)
+
+        # Perform outer sum to get bias matrix
+        bias = rel_h + rel_w  # (2*H-1, 1, 2*W-1, head_dim)
+        return bias
+
+    @staticmethod
+    def _expand_rel_pos(rel_pos: Tensor, length: int) -> Tensor:
+        """
+        Expand relative positional embeddings for a given length.
+        """
+        total_rel_len = 2 * length - 1
+        return F.pad(rel_pos, (0, 0, length - 1, length - 1))[:total_rel_len]
 
 
 def window_partition(x: torch.Tensor, window_size: int) -> Tuple[torch.Tensor, Tuple[int, int]]:

@@ -11,6 +11,7 @@ import math
 from typing import Tuple, Type
 
 from .common import MLPBlock
+import torch.nn.functional as F
 
 
 class TwoWayTransformer(nn.Module):
@@ -54,7 +55,7 @@ class TwoWayTransformer(nn.Module):
                 )
             )
 
-        self.final_attn_token_to_image = Attention(
+        self.final_attn_token_to_image = FlashAttention(
             embedding_dim, num_heads, downsample_rate=attention_downsample_rate
         )
         self.norm_final_attn = nn.LayerNorm(embedding_dim)
@@ -130,10 +131,10 @@ class TwoWayAttentionBlock(nn.Module):
           skip_first_layer_pe (bool): skip the PE on the first layer
         """
         super().__init__()
-        self.self_attn = Attention(embedding_dim, num_heads)
+        self.self_attn = FlashAttention(embedding_dim, num_heads)
         self.norm1 = nn.LayerNorm(embedding_dim)
 
-        self.cross_attn_token_to_image = Attention(
+        self.cross_attn_token_to_image = FlashAttention(
             embedding_dim, num_heads, downsample_rate=attention_downsample_rate
         )
         self.norm2 = nn.LayerNorm(embedding_dim)
@@ -142,7 +143,7 @@ class TwoWayAttentionBlock(nn.Module):
         self.norm3 = nn.LayerNorm(embedding_dim)
 
         self.norm4 = nn.LayerNorm(embedding_dim)
-        self.cross_attn_image_to_token = Attention(
+        self.cross_attn_image_to_token = FlashAttention(
             embedding_dim, num_heads, downsample_rate=attention_downsample_rate
         )
 
@@ -180,7 +181,6 @@ class TwoWayAttentionBlock(nn.Module):
         keys = self.norm4(keys)
 
         return queries, keys
-
 
 class Attention(nn.Module):
     """
@@ -220,6 +220,7 @@ class Attention(nn.Module):
         q = self.q_proj(q)
         k = self.k_proj(k)
         v = self.v_proj(v)
+        
 
         # Separate into heads
         q = self._separate_heads(q, self.num_heads)
@@ -238,3 +239,63 @@ class Attention(nn.Module):
         out = self.out_proj(out)
 
         return out
+
+class FlashAttention(nn.Module):
+    """
+    An attention layer that allows for downscaling the size of the embedding
+    after projection to queries, keys, and values, now using PyTorch's
+    scaled_dot_product_attention for optimized attention computation.
+    """
+
+    def __init__(
+        self,
+        embedding_dim: int,
+        num_heads: int,
+        downsample_rate: int = 1,
+    ) -> None:
+        super().__init__()
+        self.embedding_dim = embedding_dim
+        self.internal_dim = embedding_dim // downsample_rate
+        self.num_heads = num_heads
+        assert self.internal_dim % num_heads == 0, "num_heads must divide embedding_dim."
+
+        self.q_proj = nn.Linear(embedding_dim, self.internal_dim)
+        self.k_proj = nn.Linear(embedding_dim, self.internal_dim)
+        self.v_proj = nn.Linear(embedding_dim, self.internal_dim)
+        self.out_proj = nn.Linear(self.internal_dim, embedding_dim)
+
+    def _separate_heads(self, x: Tensor) -> Tensor:
+        b, n, c = x.shape
+        x = x.reshape(b, n, self.num_heads, c // self.num_heads)
+        return x.transpose(1, 2) 
+
+    def _recombine_heads(self, x: Tensor) -> Tensor:
+        b, n_heads, n_tokens, c_per_head = x.shape
+        x = x.transpose(1, 2)
+        return x.reshape(b, n_tokens, n_heads * c_per_head) # (B, seq_len, embedding_dim)
+
+    def forward(self, q: Tensor, k: Tensor, v: Tensor) -> Tensor:
+        # Input projections
+        q = self.q_proj(q)  # (B, seq_len, internal_dim)
+        k = self.k_proj(k)
+        v = self.v_proj(v)
+        
+
+        # Separate into heads
+        q = self._separate_heads(q)  # (B, num_heads, seq_len, head_dim)
+        k = self._separate_heads(k)
+        v = self._separate_heads(v)
+
+        # Compute scaled dot-product attention
+        attn_output = F.scaled_dot_product_attention(
+            query=q,
+            key=k,
+            value=v,
+            dropout_p=0.0,  # Set dropout if needed during training
+        )  # (B, num_heads, seq_len, head_dim)
+        # Recombine heads and project output
+        out = self._recombine_heads(attn_output)  # (B, seq_len, internal_dim)
+        out = self.out_proj(out)  # (B, seq_len, embedding_dim)
+
+        return out
+
