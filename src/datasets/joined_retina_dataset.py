@@ -1,6 +1,7 @@
 from typing import Callable, Literal, Optional
 from typing_extensions import Self
 from pydantic import BaseModel, Field
+from src.datasets.aria_dataset import ARIADataset, ARIADatasetArgs
 from src.models.auto_sam_model import SAMSampleFileReference
 from src.args.yaml_config import YamlConfigModel
 from src.datasets.base_dataset import BaseDataset, JoinedDataset
@@ -11,9 +12,15 @@ from src.datasets.stare_dataset import STAREDataset, STAREDatasetArgs
 
 
 class JoinedRetinaDatasetArgs(
-    DriveDatasetArgs, ChaseDb1DatasetArgs, STAREDatasetArgs, HrfDatasetArgs
+    DriveDatasetArgs,
+    ChaseDb1DatasetArgs,
+    STAREDatasetArgs,
+    HrfDatasetArgs,
+    ARIADatasetArgs,
 ):
-    pass
+    include_aria: bool = Field(
+        default=True, description="Include ARIA dataset in the joined dataset"
+    )
 
 
 class JoinedRetinaDataset(JoinedDataset):
@@ -29,4 +36,9 @@ class JoinedRetinaDataset(JoinedDataset):
         chase_db1 = ChaseDb1Dataset(config=config, yaml_config=yaml_config)
         hrf = HrfDataset(config=config, yaml_config=yaml_config)
         stare = STAREDataset(config=config, yaml_config=yaml_config)
-        return cls([drive, chase_db1, hrf, stare], drive.get_collate_fn())
+
+        datasets = [drive, chase_db1, hrf, stare]
+        if config.include_aria:
+            aria = ARIADataset(config=config, yaml_config=yaml_config)
+            datasets.append(aria)
+        return cls(datasets, drive.get_collate_fn())
