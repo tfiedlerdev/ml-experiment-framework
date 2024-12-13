@@ -61,6 +61,7 @@ class BaseExperimentArgs(PDBaseModel):
     )
     results_subdir_name: Optional[str] = None
     use_cuda: bool = True
+    amp: bool = Field(default=True, description="Use automatic mixed precision")
 
 
 class BaseExperiment(metaclass=ABCMeta):

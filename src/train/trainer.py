@@ -46,7 +46,9 @@ class Trainer:
         for i, batch in enumerate(data_loader):
             batch = cast(Batch, batch).to(self.device)
             self.optimizer.zero_grad()
-            with torch.autocast(device_type=self.device, dtype=torch.float16):
+            with torch.autocast(
+                device_type=self.device, dtype=torch.float16, enabled=self.config.amp
+            ):
                 if self.config.whiteNoiseSD > 0:
                     input = batch.input
                     noised_input = input + (
