@@ -12,6 +12,31 @@ from src.datasets.base_dataset import Batch
 from src.experiments.base_experiment import BaseExperiment
 from src.train.evaluator import Evaluator
 from src.train.history import EpochLosses, SingleEpochHistory, TrainHistory
+import signal
+import sys
+
+
+class GracefulKiller:
+    def __init__(self, max_interrupts=3):
+        self.received_signal = False
+        self.interrupt_count = 0
+        self.max_interrupts = max_interrupts
+        signal.signal(signal.SIGINT, self._handle_signal)
+
+    def _handle_signal(self, signum, frame):
+        self.interrupt_count += 1
+        if self.interrupt_count >= self.max_interrupts:
+            print(f"Received Ctrl+C {self.max_interrupts} times. Stopping immediately.")
+            sys.exit(1)
+        else:
+            remaining = self.max_interrupts - self.interrupt_count
+            print(
+                f"Ctrl+C received. Finishing current epoch. Press {remaining} more times to stop immediately."
+            )
+            self.received_signal = True
+
+    def should_stop(self):
+        return self.received_signal
 
 
 class Trainer:
@@ -29,6 +54,7 @@ class Trainer:
         self.loss_name = experiment.get_loss_name()
         self.optimizer = experiment.create_optimizer()
         self.scheduler = experiment.create_scheduler(self.optimizer)
+        self.killer = GracefulKiller()
 
     def _log_intermediate(self, batch: int, n_batches: int, evaluator: Evaluator):
         loss = evaluator.get_latest_loss()
@@ -213,6 +239,9 @@ class Trainer:
                         f"\nEarly stopping after {epoch} epochs ({self.config.early_stopping_patience} epochs without improvement in validation {self.config.best_model_metric} metrics)"
                     )
                     break
+            if self.killer.should_stop():
+                print("Early stopping due to user interrupt")
+                break
 
         if self.config.return_best_model:
             self.model.load_state_dict(torch.load(best_model_path))
