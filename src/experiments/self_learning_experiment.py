@@ -129,7 +129,7 @@ class SelfLearningExperiment(BaseExperiment):
                 {
                     "params": cast(
                         AutoSamModel, self.model
-                    ).sam.prompt_encoder.parameters(),
+                    ).prompt_encoder.parameters(),
                     "lr": (
                         self.config.prompt_encoder_lr
                         if self.config.prompt_encoder_lr is not None
