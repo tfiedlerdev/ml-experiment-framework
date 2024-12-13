@@ -80,28 +80,28 @@ class AutoSamModel(BaseModel[SAMBatch]):
             batch.input, (Idim, Idim), mode="bilinear", align_corners=True
         )
         dense_embeddings = self.prompt_encoder(orig_imgs_small)
-        masks = norm_batch(
-            sam_call(
-                batch.input, self.sam, dense_embeddings, self.image_encoder_no_grad
-            )
+        masks = sam_call(
+            batch.input, self.sam, dense_embeddings, self.image_encoder_no_grad
         )
 
         return ModelOutput(masks)
 
     def compute_loss(self, outputs: ModelOutput, batch: SAMBatch) -> Loss:
         assert batch.target is not None
+
+        normalized_logits = norm_batch(outputs.logits)
         size = outputs.logits.shape[2:]
         gts_sized = F.interpolate(batch.target.unsqueeze(dim=1), size, mode="nearest")
 
         bce = self.bce_loss.forward(outputs.logits, gts_sized)
-        dice_loss = compute_dice_loss(outputs.logits, gts_sized)
+        dice_loss = compute_dice_loss(normalized_logits, gts_sized)
         loss_value = bce + dice_loss
 
         input_size = tuple(batch.image_size[0][-2:].int().tolist())
         original_size = tuple(batch.original_size[0][-2:].int().tolist())
         gts = batch.target.unsqueeze(dim=0)
         masks = self.sam.postprocess_masks(
-            outputs.logits, input_size=input_size, original_size=original_size
+            normalized_logits, input_size=input_size, original_size=original_size
         )
         gts = self.sam.postprocess_masks(
             batch.target.unsqueeze(dim=0),
