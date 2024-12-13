@@ -24,7 +24,6 @@ class YamlConfigModel(BaseModel):
         default="/dhc/projects/ukbiobank/derived/imaging/retinal_fundus/images_resized_224",
         description="Directory where UK Biobank data is stored",
     )
-    # TODO: Generate masks and reference here
     ukbiobank_masks_dir: str = Field(
         default="/dhc/groups/mp2024cl2/retina_masks_ukbiobank",
         description="Directory where UK Biobank masks are stored",
