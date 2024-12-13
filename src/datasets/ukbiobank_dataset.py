@@ -158,6 +158,7 @@ class UkBiobankDataset(BaseDataset):
         mask_folder = (
             Path(self.yaml_config.ukbiobank_masks_dir)
             / f"v{self.config.mask_iteration}"
+            / "generated_masks"
         )
         filter_scores_filepath = Path(self.config.filter_scores_filepath)
 
