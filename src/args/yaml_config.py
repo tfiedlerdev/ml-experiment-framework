@@ -48,6 +48,10 @@ class YamlConfigModel(BaseModel):
         default="/dhc/dsets/Retina-Filter",
         description="The path to the FilterDataset",
     )
+    filter_threshold: float = Field(
+        default=0.2,
+        description="Threshold for filtering samples. Samples with a positive probability above this threshold will be considered.",
+    )
     aria_dset_path: str = Field(
         default="/dhc/dsets/ARIA",
         description="The path to the ARIA dataset",
