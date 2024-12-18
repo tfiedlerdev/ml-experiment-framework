@@ -169,8 +169,7 @@ class UkBiobankDataset(BaseDataset):
             for line in filter_scores[1:]:
                 path, neg_prob, pos_prob, prediction = line.strip().split(",")
                 if float(pos_prob) >= self.yaml_config.filter_threshold:
-                    continue
-                selected_samples.append(path)
+                    selected_samples.append(path)
 
         sample_paths = [
             (path, mask_folder / path.split("/")[-1] if self.with_masks else None)
