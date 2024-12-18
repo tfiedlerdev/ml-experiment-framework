@@ -43,7 +43,6 @@ class RefugeDataset(BaseDataset):
         config: RefugeDatasetArgs,
         yaml_config: YamlConfigModel,
         samples: Optional[list[RefugeFileReference]] = None,
-        image_enc_img_size=1024,
     ):
         self.yaml_config = yaml_config
         self.config = config
@@ -53,7 +52,9 @@ class RefugeDataset(BaseDataset):
             self.yaml_config.fundus_pixel_std,
         )
         self.sam_trans = ResizeLongestSide(
-            image_enc_img_size, pixel_mean=pixel_mean, pixel_std=pixel_std
+            self.yaml_config.fundus_resize_img_size,
+            pixel_mean=pixel_mean,
+            pixel_std=pixel_std,
         )
 
     def __getitem__(self, index: int) -> RefugeSample:

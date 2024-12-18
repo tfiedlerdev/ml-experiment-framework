@@ -44,7 +44,6 @@ class STAREDataset(BaseDataset):
         config: STAREDatasetArgs,
         yaml_config: YamlConfigModel,
         samples: Optional[list[STAREFileReference]] = None,
-        image_enc_img_size=1024,
     ):
         self.yaml_config = yaml_config
         self.config = config
@@ -54,7 +53,9 @@ class STAREDataset(BaseDataset):
             self.yaml_config.fundus_pixel_std,
         )
         self.sam_trans = ResizeLongestSide(
-            image_enc_img_size, pixel_mean=pixel_mean, pixel_std=pixel_std
+            self.yaml_config.fundus_resize_img_size,
+            pixel_mean=pixel_mean,
+            pixel_std=pixel_std,
         )
 
     def __getitem__(self, index: int) -> STARESample:

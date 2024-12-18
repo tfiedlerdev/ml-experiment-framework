@@ -42,7 +42,6 @@ class ChaseDb1Dataset(BaseDataset):
         config: ChaseDb1DatasetArgs,
         yaml_config: YamlConfigModel,
         samples: Optional[list[ChaseDb1FileReference]] = None,
-        image_enc_img_size=1024,
     ):
         self.yaml_config = yaml_config
         self.config = config
@@ -52,7 +51,9 @@ class ChaseDb1Dataset(BaseDataset):
             self.yaml_config.fundus_pixel_std,
         )
         self.sam_trans = ResizeLongestSide(
-            image_enc_img_size, pixel_mean=pixel_mean, pixel_std=pixel_std
+            self.yaml_config.fundus_resize_img_size,
+            pixel_mean=pixel_mean,
+            pixel_std=pixel_std,
         )
 
     def __getitem__(self, index: int) -> ChaseDb1Sample:

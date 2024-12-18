@@ -57,7 +57,6 @@ class UkBiobankDataset(BaseDataset):
         config: UkBiobankDatasetArgs,
         yaml_config: YamlConfigModel,
         samples: Optional[list[BiobankSampleReference]] = None,
-        image_enc_img_size=1024,
         with_masks=False,
         random_augmentation_for_all_splits=False,
     ):
@@ -70,7 +69,7 @@ class UkBiobankDataset(BaseDataset):
             self.yaml_config.fundus_pixel_std,
         )
         self.sam_trans = ResizeLongestSide(
-            image_enc_img_size,
+            self.yaml_config.fundus_resize_img_size,
             pixel_mean=pixel_mean,
             pixel_std=pixel_std,
         )

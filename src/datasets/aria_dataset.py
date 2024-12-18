@@ -45,12 +45,17 @@ class ARIADataset(BaseDataset):
         config: ARIADatasetArgs,
         yaml_config: YamlConfigModel,
         samples: Optional[list[ARIASampleFileReference]] = None,
-        image_enc_img_size=1024,
     ):
         self.yaml_config = yaml_config
         self.config = config
         self.samples = self.load_data() if samples is None else samples
-        self.sam_trans = ResizeLongestSide(image_enc_img_size)
+        pixel_mean, pixel_std = (
+            self.yaml_config.fundus_pixel_mean,
+            self.yaml_config.fundus_pixel_std,
+        )
+        self.sam_trans = ResizeLongestSide(
+            self.yaml_config.fundus_resize_img_size, pixel_mean, pixel_std
+        )
 
     def __getitem__(self, index: int) -> ARIASample:
         sample = self.samples[index]

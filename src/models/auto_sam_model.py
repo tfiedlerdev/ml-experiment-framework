@@ -147,6 +147,7 @@ class AutoSamModel(BaseModel[SAMBatch]):
         image: np.ndarray,
         pixel_mean: tuple[float, float, float],
         pixel_std: tuple[float, float, float],
+        img_encoder_size: int,
     ):
         import cv2
         from .segment_anything.utils.transforms import ResizeLongestSide
@@ -155,7 +156,7 @@ class AutoSamModel(BaseModel[SAMBatch]):
         img, _ = test_transform(image, np.zeros_like(image))
         original_size = tuple(img.shape[1:3])
 
-        transform = ResizeLongestSide(1024, pixel_mean, pixel_std)
+        transform = ResizeLongestSide(img_encoder_size, pixel_mean, pixel_std)
         Idim = self.config.Idim
 
         image_tensor = transform.apply_image_torch(img)
@@ -188,7 +189,9 @@ class AutoSamModel(BaseModel[SAMBatch]):
             yaml_config.fundus_pixel_mean,
             yaml_config.fundus_pixel_std,
         )
-        return self.segment_image(image, pixel_mean, pixel_std)
+        return self.segment_image(
+            image, pixel_mean, pixel_std, yaml_config.fundus_resize_img_size
+        )
 
     def segment_and_write_image_from_file(
         self,

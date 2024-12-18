@@ -64,6 +64,10 @@ class YamlConfigModel(BaseModel):
         default=(81.19483977869938, 35.06718212261534, 14.044927086746483),
         description="Standard deviation per color channel of fundus images in train partition of JoinedRetinaDataset (RGB)",
     )
+    fundus_resize_img_size: int = Field(
+        default=512,
+        description="Size to which fundus images are resized before training",
+    )
 
 
 class YamlConfig:
