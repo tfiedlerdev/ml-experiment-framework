@@ -7,6 +7,7 @@ import torch
 import wandb
 from torch.utils.data import DataLoader
 
+from src.models.auto_sam_model import norm_batch
 from src.models.base_model import Loss, ModelOutput
 from src.experiments.self_learning_experiment import SelfLearningExperiment
 from src.datasets.base_dataset import Batch
@@ -103,7 +104,7 @@ class SelfTrainer(Trainer):
             # TODO: Input is already augmented here
             # Does input augmentation reduce the quality of the pseudo labels?
             with torch.no_grad():
-                unlabeled_batch.target = self.model.forward(unlabeled_batch).logits
+                unlabeled_batch.target = norm_batch( self.model.forward(unlabeled_batch).logits)
 
             sup_outputs, sup_loss = self._backward_batch_student(batch)
             unsup_outputs, unsup_loss = self._backward_batch_student(unlabeled_batch)

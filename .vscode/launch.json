@@ -130,7 +130,7 @@
                 "--step_size=5",
                 "--best_model_metric=IoU",
                 "--minimize_best_model_metric=false",
-                "--from_checkpoint=/dhc/home/leon.hermann/MP/mp-lippert-experiments/results/multi_ds_vessel_experiment/2024-12-11_15#36#45/model.pt",
+                "--from_checkpoint=/dhc/groups/mp2024cl2/results/multi_ds_vessel_experiment/reference_flashattn_waria/model.pt",
             ]
         },
         {

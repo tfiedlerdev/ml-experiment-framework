@@ -56,13 +56,13 @@ class UkBioBankExperiment(BaseExperiment):
             train_percentage=1.0,
             val_percentage=0.0,
             test_percentage=0.0,
-            augment_train=self.config.augment_train,
             filter_scores_filepath=self.config.filter_scores_filepath,
         )
         self.biobank = UkBiobankDataset(
             config=biobank_config,
             yaml_config=yaml_config,
             with_masks=True,
+            random_augmentation_for_all_splits=self.config.augment_train,
         )
         self.joined_retina = JoinedRetinaDataset.from_config(self.config, yaml_config)
         super().__init__(config, yaml_config)
