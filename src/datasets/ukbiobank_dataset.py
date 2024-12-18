@@ -24,7 +24,6 @@ class UkBiobankDatasetArgs(BaseModel):
         "/dhc/groups/mp2024cl2/ukbiobank_filters/filter_predictions.csv"
     )
     mask_iteration: int = 0
-    augment_train: bool = True
 
 
 @dataclass
@@ -60,6 +59,7 @@ class UkBiobankDataset(BaseDataset):
         samples: Optional[list[BiobankSampleReference]] = None,
         image_enc_img_size=1024,
         with_masks=False,
+        random_augmentation_for_all_splits=False,
     ):
         self.config = config
         self.yaml_config = yaml_config
@@ -74,6 +74,7 @@ class UkBiobankDataset(BaseDataset):
             pixel_mean=pixel_mean,
             pixel_std=pixel_std,
         )
+        self.random_augmentation_for_all_splits = random_augmentation_for_all_splits
         total_percentage = (
             self.config.train_percentage
             + self.config.val_percentage
@@ -95,14 +96,14 @@ class UkBiobankDataset(BaseDataset):
 
         augmentations = (
             test_transform
-            if file_ref.split == "test" or not self.config.augment_train
+            if file_ref.split == "test" and not self.random_augmentation_for_all_splits
             else train_transform
         )
         image = self.cv2_loader(str(file_ref.img_path), is_mask=False)
         gt = (
             self.cv2_loader(str(file_ref.gt_path), is_mask=True)
             if self.with_masks
-            else np.zeros_like(image)
+            else np.zeros((image.shape[0], image.shape[1]), dtype=image.dtype)
         )
 
         img, mask = augmentations(image, gt)

@@ -117,13 +117,16 @@ class BaseExperiment(metaclass=ABCMeta):
 
             print("")
 
-    def run(self):
+    def _create_trainer(self):
         from src.train.trainer import Trainer
 
+        return Trainer(self)
+
+    def run(self):
         if self.base_config.use_wandb:
             wandb.login(key=self.yaml_config.wandb_api_key, relogin=True)
 
-        trainer = Trainer(self)
+        trainer = self._create_trainer()
         wandb.init(
             project=self.yaml_config.wandb_project_name,
             entity=self.yaml_config.wandb_entity,

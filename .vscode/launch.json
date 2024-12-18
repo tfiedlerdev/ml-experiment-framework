@@ -108,6 +108,32 @@
             ]
         },
         {
+            "name": "Run.py with self learning",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/run.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--experiment_id=self_learning_experiment",
+                "--sam_model=vit_b",
+                "--learning_rate=0.00001",
+                "--image_encoder_lr=0.00001",
+                "--prompt_encoder_lr=0.0003",
+                "--mask_decoder_lr=0.0001",
+                "--batch_size=1",
+                "--secondary_batch_size=3",
+                "--epochs=100",
+                "--weight_decay=1e-4",
+                "--early_stopping_patience=10",
+                "--visualize_n_segmentations=5",
+                "--gamma=0.85",
+                "--step_size=5",
+                "--best_model_metric=IoU",
+                "--minimize_best_model_metric=false",
+                "--from_checkpoint=/dhc/groups/mp2024cl2/results/multi_ds_vessel_experiment/reference_flashattn_waria/model.pt",
+            ]
+        },
+        {
             "name": "Run.py with ukbiobank",
             "type": "debugpy",
             "request": "launch",

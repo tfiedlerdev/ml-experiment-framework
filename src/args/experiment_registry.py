@@ -1,4 +1,5 @@
 from typing import Type
+from src.experiments.self_learning_experiment import SelfLearningExperiment
 from src.experiments.ukbiobank_experiment import UkBioBankExperiment
 from src.experiments.aria_experiment import ARIAExperiment
 from src.experiments.resnet_filter_experiment import ResnetFilterExperiment
@@ -18,4 +19,5 @@ experiments: dict[str, Type[BaseExperiment]] = {
     "resnet_filter": ResnetFilterExperiment,
     "uk_biobank_experiment": UkBioBankExperiment,
     "aria": ARIAExperiment,
+    "self_learning_experiment": SelfLearningExperiment,
 }

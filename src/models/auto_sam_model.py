@@ -91,7 +91,15 @@ class AutoSamModel(BaseModel[SAMBatch]):
 
         normalized_logits = norm_batch(outputs.logits)
         size = outputs.logits.shape[2:]
-        gts_sized = F.interpolate(batch.target.unsqueeze(dim=1), size, mode="nearest")
+        gts_sized = F.interpolate(
+            (
+                batch.target.unsqueeze(dim=1)
+                if batch.target.dim() != outputs.logits.dim()
+                else batch.target
+            ),
+            size,
+            mode="nearest",
+        )
 
         bce = self.bce_loss.forward(outputs.logits, gts_sized)
         dice_loss = compute_dice_loss(normalized_logits, gts_sized)
@@ -104,7 +112,7 @@ class AutoSamModel(BaseModel[SAMBatch]):
             normalized_logits, input_size=input_size, original_size=original_size
         )
         gts = self.sam.postprocess_masks(
-            batch.target.unsqueeze(dim=0),
+            batch.target.unsqueeze(dim=0) if batch.target.dim() != 4 else batch.target,
             input_size=input_size,
             original_size=original_size,
         )
