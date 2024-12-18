@@ -25,9 +25,9 @@ class Evaluator:
 
     def track_batch(self, predictions: ModelOutput, loss: Loss, sample: Batch):
         assert loss.loss is not None
-        self.running_loss += loss.loss.item()
+        self.running_loss += loss.loss.detach().cpu().item()
         self.n_losses += 1
-        self.latest_loss = loss.loss.item()
+        self.latest_loss = loss.loss.detach().cpu().item()
         decoded = (
             DecodedPredictionBatch(
                 self.extract_predicted_labels(predictions),
