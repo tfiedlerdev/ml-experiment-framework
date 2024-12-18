@@ -8,7 +8,15 @@ import torch
 
 from functools import partial
 
-from .modeling import ImageEncoderViT, MaskDecoder, PromptEncoder, Sam, TwoWayTransformer, SamBatched
+from src.args.yaml_config import YamlConfig
+
+from .modeling import (
+    ImageEncoderViT,
+    MaskDecoder,
+    PromptEncoder,
+    TwoWayTransformer,
+    SamBatched,
+)
 
 
 def build_sam_vit_h(checkpoint=None):
@@ -62,7 +70,9 @@ def _build_sam(
     prompt_embed_dim = 256
     image_size = 1024
     vit_patch_size = 16
-    image_embedding_size = image_size // vit_patch_size
+
+    custom_img_size = YamlConfig().config.fundus_resize_img_size
+    image_embedding_size = custom_img_size // vit_patch_size
     sam = SamBatched(
         image_encoder=ImageEncoderViT(
             depth=encoder_depth,
@@ -80,8 +90,9 @@ def _build_sam(
         ),
         prompt_encoder=PromptEncoder(
             embed_dim=prompt_embed_dim,
+            # Changed based on https://github.com/ByungKwanLee/Full-Segment-Anything/blob/1f31e00e833ca8b3603e42d07bd7c52768905125/build_sam.py#L73
             image_embedding_size=(image_embedding_size, image_embedding_size),
-            input_image_size=(image_size, image_size),
+            input_image_size=(custom_img_size, custom_img_size),
             mask_in_chans=16,
         ),
         mask_decoder=MaskDecoder(
@@ -95,6 +106,7 @@ def _build_sam(
             transformer_dim=prompt_embed_dim,
             iou_head_depth=3,
             iou_head_hidden_dim=256,
+            custom_img_size=True,
         ),
         pixel_mean=[123.675, 116.28, 103.53],
         pixel_std=[58.395, 57.12, 57.375],
@@ -104,4 +116,6 @@ def _build_sam(
         with open(checkpoint, "rb") as f:
             state_dict = torch.load(f)
         sam.load_state_dict(state_dict)
+
+    sam.image_encoder.scale_pos_embed(custom_img_size)
     return sam

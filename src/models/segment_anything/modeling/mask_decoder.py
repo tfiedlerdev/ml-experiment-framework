@@ -23,6 +23,7 @@ class MaskDecoder(nn.Module):
         activation: Type[nn.Module] = nn.GELU,
         iou_head_depth: int = 3,
         iou_head_hidden_dim: int = 256,
+        custom_img_size: bool = False
     ) -> None:
         """
         Predicts masks given an image and prompt embeddings, using a
@@ -71,6 +72,7 @@ class MaskDecoder(nn.Module):
         self.iou_prediction_head = MLP(
             transformer_dim, iou_head_hidden_dim, self.num_mask_tokens, iou_head_depth
         )
+        self.custom_img_size = custom_img_size
 
     def forward(
         self,
@@ -113,6 +115,20 @@ class MaskDecoder(nn.Module):
         # Prepare output
         return masks, iou_pred
 
+    # by LBK EDIT. Source https://github.com/ByungKwanLee/Full-Segment-Anything/blob/1f31e00e833ca8b3603e42d07bd7c52768905125/modeling/mask_decoder.py#L113
+    @staticmethod
+    def interpolate(x, w, h):
+        height, width = x.shape[2:]
+        # we add a small number to avoid floating point error in the interpolation
+        # see discussion at https://github.com/facebookresearch/dino/issues/8
+        w0, h0 = w + 0.1, h + 0.1
+        x = nn.functional.interpolate(
+            x,
+            scale_factor=(w0 / height, h0 / width),
+            mode="bicubic",
+        )
+        return x
+
     def predict_masks(
         self,
         image_embeddings: torch.Tensor,
@@ -132,12 +148,22 @@ class MaskDecoder(nn.Module):
 
         # Expand per-image data in batch direction to be per-mask
         src = torch.repeat_interleave(image_embeddings, tokens.shape[0], dim=0)
-        src = src + dense_prompt_embeddings
+        # Based on LBK EDIT. Source: https://github.com/ByungKwanLee/Full-Segment-Anything/blob/1f31e00e833ca8b3603e42d07bd7c52768905125/modeling/mask_decoder.py#L143
+        if self.custom_img_size:
+            src = src + self.interpolate(dense_prompt_embeddings, *src.shape[2:])
+        else:
+            src = src + dense_prompt_embeddings
         pos_src = torch.repeat_interleave(image_pe, tokens.shape[0], dim=0)
         b, c, h, w = src.shape
 
         # Run the transformer
-        hs, src = self.transformer(src, pos_src, tokens)
+        # by LBK EDIT
+        if not self.custom_img_size:
+            hs, src = self.transformer(src, pos_src, tokens)
+        else:
+            hs, src = self.transformer(
+                src, self.interpolate(pos_src, *src.shape[2:]), tokens
+            )
         iou_token_out = hs[:, 0, :]
         mask_tokens_out = hs[:, 1 : (1 + self.num_mask_tokens), :]
 

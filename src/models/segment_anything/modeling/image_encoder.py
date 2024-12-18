@@ -118,6 +118,36 @@ class ImageEncoderViT(nn.Module):
 
         return x
 
+    # by LBK EDIT. Source https://github.com/ByungKwanLee/Full-Segment-Anything/blob/1f31e00e833ca8b3603e42d07bd7c52768905125/modeling/image_encoder.py#L124C1-L133C31
+    def interpolate_pos_encoding(self, h, w):
+        assert self.pos_embed is not None
+        height, width = self.pos_embed.shape[1:3]
+
+        patch_pos_embed = nn.functional.interpolate(
+            self.pos_embed.permute(0, 3, 1, 2),
+            scale_factor=(h / height, w / width),
+            mode="bicubic",
+        ).permute(0, 2, 3, 1)
+        return patch_pos_embed
+
+    def scale_pos_embed(self, input_img_size: int):
+        assert self.pos_embed is not None
+        target_size = self.patch_embed(
+            torch.zeros(
+                1, 3, input_img_size, input_img_size, device=self.pos_embed.device
+            )
+        ).shape[1:3]
+        current_size = self.pos_embed.shape[1]
+        if max(target_size) > current_size:
+            print("Warning: Scaling positional embedding up to input image size.")
+        if max(target_size) != current_size:
+            self.pos_embed = nn.Parameter(self.interpolate_pos_encoding(*target_size))
+            self.img_size = input_img_size
+        else:
+            print(
+                f"Positional embedding (shape {self.pos_embed.shape}) is already scaled to the input image size of {input_img_size}. Skipping scaling."
+            )
+
 
 class Block(nn.Module):
     """Transformer blocks with support of window attention and residual propagation blocks"""
