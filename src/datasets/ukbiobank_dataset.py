@@ -167,7 +167,7 @@ class UkBiobankDataset(BaseDataset):
             filter_scores = f.readlines()
             for line in filter_scores[1:]:
                 path, neg_prob, pos_prob, prediction = line.strip().split(",")
-                if prediction == "0":
+                if float(pos_prob) >= self.yaml_config.filter_threshold:
                     continue
                 selected_samples.append(path)
 
