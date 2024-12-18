@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import re
 from src.models.auto_sam_model import SAMBatch, SAMSampleFileReference
-from src.datasets.refuge_dataset import get_polyp_transform
+from src.util.polyp_transform import get_polyp_transform
 import src.util.transforms_shir as transforms
 import numpy as np
 import cv2
@@ -19,6 +19,8 @@ from typing_extensions import Self
 import os
 from PIL import Image
 
+from src.util.datatset_helper import suggest_split
+
 
 @dataclass
 class ARIASample(Sample):
@@ -26,11 +28,15 @@ class ARIASample(Sample):
     image_size: torch.Tensor
 
 
-
 class ARIADatasetArgs(BaseModel):
     """Define arguments for the dataset here, i.e. preprocessing related stuff etc"""
 
-    annotator: Literal["BSS", "BDP"] = "BSS"
+    aria_annotator: Literal["BSS", "BDP"] = "BSS"
+
+
+@dataclass
+class ARIASampleFileReference(SAMSampleFileReference):
+    split: str
 
 
 class ARIADataset(BaseDataset):
@@ -38,7 +44,7 @@ class ARIADataset(BaseDataset):
         self,
         config: ARIADatasetArgs,
         yaml_config: YamlConfigModel,
-        samples: Optional[list[SAMSampleFileReference]] = None,
+        samples: Optional[list[ARIASampleFileReference]] = None,
         image_enc_img_size=1024,
     ):
         self.yaml_config = yaml_config
@@ -88,7 +94,11 @@ class ARIADataset(BaseDataset):
         return collate
 
     def get_split(self, split: Literal["train", "val", "test"]) -> Self:
-        raise NotImplementedError("Splitting not implemented for ARIA dataset")
+        return self.__class__(
+            self.config,
+            self.yaml_config,
+            [s for s in self.samples if s.split == split],
+        )
 
     def load_data(self):
         imgs_dir = os.path.join(self.yaml_config.aria_dset_path, "images")
@@ -98,16 +108,18 @@ class ARIADataset(BaseDataset):
             (
                 str(Path(imgs_dir) / img_file),
                 str(
-                    Path(gts_dir) / f"{img_file.removesuffix('.tif')}_{self.config.annotator}.tif"
-
+                    Path(gts_dir)
+                    / f"{img_file.removesuffix('.tif')}_{self.config.aria_annotator}.tif"
                 ),
             )
             for img_file in os.listdir(imgs_dir)
         ]
 
         return [
-            SAMSampleFileReference(
-                img_path=img, gt_path=mask, 
+            ARIASampleFileReference(
+                img_path=img,
+                gt_path=mask,
+                split=suggest_split(i, len(images_and_masks_paths), 0.8, False),
             )
             for i, (img, mask) in enumerate(images_and_masks_paths)
         ]

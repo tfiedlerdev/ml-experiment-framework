@@ -161,5 +161,36 @@
                 "--use_wandb=true",
             ]
         },
+        //python run.py --experiment_id=uk_biobank_experiment --sam_model=vit_b --learning_rate=0.0003 --batch_size=4 --epochs=5 --weight_decay=1e-4 --early_stopping_patience=2 --visualize_n_segmentations=5 --gamma=0.85 --step_size=1 --best_model_metric=IoU --minimize_best_model_metric=false --prompt_encoder_checkpoint=/dhc/groups/mp2024cl2/results/multi_ds_vessel_experiment/2024-11-21_14#26#29/prompt_encoder.pt --image_encoder_lr=0.00005 --prompt_encoder_lr=0.0003 --mask_decoder_lr=0.0001 --use_wandb=false --drive_test_equals_val=false --wandb_experiment_name=biobank_sanitycheck --augment_train=false --filter_scores_filepath=/dhc/groups/mp2024cl2/ukbiobank_filters/filter_predictions_224.csv
+        {
+            "name": "run.py ukbiobank sanity check",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/run.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--experiment_id=uk_biobank_experiment",
+                "--learning_rate=0.0003",
+                "--batch_size=1",
+                "--epochs=5",
+                "--weight_decay=1e-4",
+                "--early_stopping_patience=2",
+                "--visualize_n_segmentations=5",
+                "--gamma=0.85",
+                "--step_size=1",
+                "--best_model_metric=IoU",
+                "--minimize_best_model_metric=false",
+                "--prompt_encoder_checkpoint=/dhc/groups/mp2024cl2/results/multi_ds_vessel_experiment/2024-11-21_14#26#29/prompt_encoder.pt",
+                "--image_encoder_lr=0.00005",
+                "--prompt_encoder_lr=0.0003",
+                "--mask_decoder_lr=0.0001",
+                "--use_wandb=false",
+                "--drive_test_equals_val=false",
+                "--wandb_experiment_name=biobank_sanitycheck",
+                "--augment_train=false",
+                "--filter_scores_filepath=/dhc/groups/mp2024cl2/ukbiobank_filters/filter_predictions_224.csv",
+                "--sam_model=vit_b"
+            ]
+        }
     ]
 }

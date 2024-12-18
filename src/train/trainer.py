@@ -2,6 +2,7 @@ import os
 import uuid
 from typing import Literal, cast
 
+from matplotlib.pyplot import sca
 import numpy as np
 import torch
 import wandb
@@ -11,6 +12,31 @@ from src.datasets.base_dataset import Batch
 from src.experiments.base_experiment import BaseExperiment
 from src.train.evaluator import Evaluator
 from src.train.history import EpochLosses, SingleEpochHistory, TrainHistory
+import signal
+import sys
+
+
+class GracefulKiller:
+    def __init__(self, max_interrupts=3):
+        self.received_signal = False
+        self.interrupt_count = 0
+        self.max_interrupts = max_interrupts
+        signal.signal(signal.SIGINT, self._handle_signal)
+
+    def _handle_signal(self, signum, frame):
+        self.interrupt_count += 1
+        if self.interrupt_count >= self.max_interrupts:
+            print(f"Received Ctrl+C {self.max_interrupts} times. Stopping immediately.")
+            sys.exit(1)
+        else:
+            remaining = self.max_interrupts - self.interrupt_count
+            print(
+                f"Ctrl+C received. Finishing current epoch. Press {remaining} more times to stop immediately."
+            )
+            self.received_signal = True
+
+    def should_stop(self):
+        return self.received_signal
 
 
 class Trainer:
@@ -28,6 +54,7 @@ class Trainer:
         self.loss_name = experiment.get_loss_name()
         self.optimizer = experiment.create_optimizer()
         self.scheduler = experiment.create_scheduler(self.optimizer)
+        self.killer = GracefulKiller()
 
     def _log_intermediate(self, batch: int, n_batches: int, evaluator: Evaluator):
         loss = evaluator.get_latest_loss()
@@ -39,38 +66,41 @@ class Trainer:
 
     def _train_epoch(self, data_loader: DataLoader):
         self.model.train()
+        scaler = torch.GradScaler(device=self.device)
         evaluator = self.experiment.create_evaluator("train")
 
         for i, batch in enumerate(data_loader):
             batch = cast(Batch, batch).to(self.device)
-
             self.optimizer.zero_grad()
-
-            if self.config.whiteNoiseSD > 0:
-                input = batch.input
-                noised_input = input + (
-                    torch.randn(input.shape, device=input.device)
-                    * self.config.whiteNoiseSD
-                )
-                batch.input = noised_input
-
-            if self.config.constantOffsetSD > 0:
-                input = batch.input
-                offset_input = input + (
-                    torch.randn(
-                        [input.shape[0], 1, input.shape[2]], device=input.device
+            with torch.autocast(
+                device_type=self.device, dtype=torch.float16, enabled=self.config.amp
+            ):
+                if self.config.whiteNoiseSD > 0:
+                    input = batch.input
+                    noised_input = input + (
+                        torch.randn(input.shape, device=input.device)
+                        * self.config.whiteNoiseSD
                     )
-                    * self.config.constantOffsetSD
-                )
-                batch.input = offset_input
+                    batch.input = noised_input
 
-            # Make predictions for this batch
-            with torch.enable_grad():
-                # calculate gradient for whole model (but only optimize parts)
-                outputs = self.model.forward(batch)
+                if self.config.constantOffsetSD > 0:
+                    input = batch.input
+                    offset_input = input + (
+                        torch.randn(
+                            [input.shape[0], 1, input.shape[2]], device=input.device
+                        )
+                        * self.config.constantOffsetSD
+                    )
+                    batch.input = offset_input
+
+                # Make predictions for this batch
+                with torch.enable_grad():
+                    # calculate gradient for whole model (but only optimize parts)
+                    outputs = self.model.forward(batch)
 
             loss = self.model.compute_loss(outputs, batch)
-            loss.loss.backward()
+
+            scaler.scale(loss.loss).backward()
 
             if self.config.gradient_clipping is not None:
                 torch.nn.utils.clip_grad_norm_(  # type: ignore
@@ -78,7 +108,9 @@ class Trainer:
                 )
 
             # Adjust learning weights
-            self.optimizer.step()
+            scaler.step(self.optimizer)
+            scaler.update()
+
             evaluator.track_batch(outputs, loss, batch)
             if (
                 i % self.config.log_every_n_batches
@@ -207,6 +239,9 @@ class Trainer:
                         f"\nEarly stopping after {epoch} epochs ({self.config.early_stopping_patience} epochs without improvement in validation {self.config.best_model_metric} metrics)"
                     )
                     break
+            if self.killer.should_stop():
+                print("Early stopping due to user interrupt")
+                break
 
         if self.config.return_best_model:
             self.model.load_state_dict(torch.load(best_model_path))

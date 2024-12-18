@@ -1,24 +1,19 @@
 from dataclasses import dataclass
 from pathlib import Path
-import re
 from src.models.auto_sam_model import SAMBatch, SAMSampleFileReference
-from src.datasets.refuge_dataset import get_polyp_transform
-import src.util.transforms_shir as transforms
+from src.util.polyp_transform import get_polyp_transform
 import numpy as np
 import cv2
-from src.datasets.base_dataset import BaseDataset, Batch, Sample
+from src.datasets.base_dataset import BaseDataset, Sample
 from src.models.segment_anything.utils.transforms import ResizeLongestSide
-from torchvision.datasets import MNIST
 from pydantic import BaseModel, Field
 from src.args.yaml_config import YamlConfigModel
-from typing import Callable, Literal, Optional
-from math import floor
+from typing import Literal, Optional
 import torch
 from typing_extensions import Self
 import os
 from PIL import Image
 
-from src.util.image_util import calculate_rgb_mean_std
 from src.util.datatset_helper import suggest_split
 
 
@@ -44,6 +39,7 @@ class DriveDatasetArgs(BaseModel):
         default=0.8,
         description="Percentage of data to use for training. Other data will be assigned to val and, if enabled, test.",
     )
+    augment_train: bool = True
 
 
 class DriveDataset(BaseDataset):
@@ -57,9 +53,9 @@ class DriveDataset(BaseDataset):
         self.yaml_config = yaml_config
         self.config = config
         self.samples = self.load_data() if samples is None else samples
-        pixel_mean, pixel_std = calculate_rgb_mean_std(
-            [s.img_path for s in self.samples],
-            os.path.join(yaml_config.cache_dir, "drive_mean_std.pkl"),
+        pixel_mean, pixel_std = (
+            self.yaml_config.fundus_pixel_mean,
+            self.yaml_config.fundus_pixel_std,
         )
         self.sam_trans = ResizeLongestSide(
             image_enc_img_size, pixel_mean=pixel_mean, pixel_std=pixel_std
@@ -69,7 +65,11 @@ class DriveDataset(BaseDataset):
         sample = self.samples[index]
         train_transform, test_transform = get_polyp_transform()
 
-        augmentations = train_transform if sample.split == "train" else test_transform
+        augmentations = (
+            train_transform
+            if sample.split == "train" and self.config.augment_train
+            else test_transform
+        )
 
         image = self.cv2_loader(sample.img_path, is_mask=False)
         gt = self.cv2_loader(sample.gt_path, is_mask=True)

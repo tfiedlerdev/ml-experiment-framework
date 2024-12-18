@@ -2,16 +2,17 @@ from dataclasses import dataclass
 from typing import Literal, Optional
 
 import torch
+from src.args.yaml_config import YamlConfig
+from src.util.polyp_transform import get_polyp_transform
 from src.models.segment_anything.build_sam import (
     build_sam_vit_b,
     build_sam_vit_h,
     build_sam_vit_l,
 )
 from src.models.base_model import BaseModel, ModelOutput, Loss
-from src.datasets.base_dataset import BaseDataset, Batch
-from src.util.nn_helper import create_fully_connected, ACTIVATION_FUNCTION
+from src.datasets.base_dataset import Batch
 from pydantic import BaseModel as PDBaseModel
-from torch.nn import BCELoss
+from torch.nn import BCEWithLogitsLoss as BCELoss
 from src.models.auto_sam_prompt_encoder.model_single import ModelEmb
 from torch.nn import functional as F
 import numpy as np
@@ -79,16 +80,16 @@ class AutoSamModel(BaseModel[SAMBatch]):
             batch.input, (Idim, Idim), mode="bilinear", align_corners=True
         )
         dense_embeddings = self.prompt_encoder(orig_imgs_small)
-        masks = norm_batch(
-            sam_call(
-                batch.input, self.sam, dense_embeddings, self.image_encoder_no_grad
-            )
+        masks = sam_call(
+            batch.input, self.sam, dense_embeddings, self.image_encoder_no_grad
         )
 
         return ModelOutput(masks)
 
     def compute_loss(self, outputs: ModelOutput, batch: SAMBatch) -> Loss:
         assert batch.target is not None
+
+        normalized_logits = norm_batch(outputs.logits)
         size = outputs.logits.shape[2:]
         gts_sized = F.interpolate(
             (
@@ -101,15 +102,14 @@ class AutoSamModel(BaseModel[SAMBatch]):
         )
 
         bce = self.bce_loss.forward(outputs.logits, gts_sized)
-        dice_loss = compute_dice_loss(outputs.logits, gts_sized)
+        dice_loss = compute_dice_loss(normalized_logits, gts_sized)
         loss_value = bce + dice_loss
 
         input_size = tuple(batch.image_size[0][-2:].int().tolist())
         original_size = tuple(batch.original_size[0][-2:].int().tolist())
-        masks = outputs.logits
         gts = batch.target.unsqueeze(dim=0)
         masks = self.sam.postprocess_masks(
-            outputs.logits, input_size=input_size, original_size=original_size
+            normalized_logits, input_size=input_size, original_size=original_size
         )
         gts = self.sam.postprocess_masks(
             batch.target.unsqueeze(dim=0) if batch.target.dim() != 4 else batch.target,
@@ -122,7 +122,9 @@ class AutoSamModel(BaseModel[SAMBatch]):
             mode="bilinear",
             align_corners=True,
         )
-        gts = F.interpolate(gts, (self.config.Idim, self.config.Idim), mode="nearest")
+        gts = F.interpolate(
+            gts, (self.config.Idim, self.config.Idim), mode="bilinear"
+        )  # was mode=nearest in original code
         masks[masks > 0.5] = 1
         masks[masks <= 0.5] = 0
         dice_score, IoU = get_dice_ji(
@@ -140,15 +142,23 @@ class AutoSamModel(BaseModel[SAMBatch]):
             },
         )
 
-    def segment_image(self, image: np.ndarray):
+    def segment_image(
+        self,
+        image: np.ndarray,
+        pixel_mean: tuple[float, float, float],
+        pixel_std: tuple[float, float, float],
+    ):
         import cv2
         from .segment_anything.utils.transforms import ResizeLongestSide
 
-        original_size = image.shape[:2]
-        transform = ResizeLongestSide(1024)
+        _, test_transform = get_polyp_transform()
+        img, _ = test_transform(image, np.zeros_like(image))
+        original_size = tuple(img.shape[1:3])
+
+        transform = ResizeLongestSide(1024, pixel_mean, pixel_std)
         Idim = self.config.Idim
-        image_tensor = torch.tensor(image).permute(2, 0, 1).float()
-        image_tensor = transform.apply_image_torch(image_tensor)
+
+        image_tensor = transform.apply_image_torch(img)
         input_size = tuple(image_tensor.shape[1:3])
         input_images = transform.preprocess(image_tensor).unsqueeze(dim=0).cuda()
 
@@ -157,13 +167,12 @@ class AutoSamModel(BaseModel[SAMBatch]):
         )
         dense_embeddings = self.prompt_encoder.forward(orig_imgs_small)
         with torch.no_grad():
-            mask = sam_call(input_images, self.sam, dense_embeddings)
+            mask = norm_batch(sam_call(input_images, self.sam, dense_embeddings))
 
         mask = self.sam.postprocess_masks(
             mask, input_size=input_size, original_size=original_size
         )
         mask = mask.squeeze().cpu().numpy()
-        mask = (mask - mask.min()) / (mask.max() - mask.min())
         mask = (255 * mask).astype(np.uint8)
         mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
         return image, mask
@@ -171,8 +180,15 @@ class AutoSamModel(BaseModel[SAMBatch]):
     def segment_image_from_file(self, image_path: str):
         import cv2
 
-        image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
-        return self.segment_image(image)
+        image = cv2.cvtColor(
+            cv2.imread(image_path, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB
+        )
+        yaml_config = YamlConfig().config
+        pixel_mean, pixel_std = (
+            yaml_config.fundus_pixel_mean,
+            yaml_config.fundus_pixel_std,
+        )
+        return self.segment_image(image, pixel_mean, pixel_std)
 
     def segment_and_write_image_from_file(
         self,

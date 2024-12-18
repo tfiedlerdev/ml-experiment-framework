@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import re
 from src.models.auto_sam_model import SAMBatch
-import src.util.transforms_shir as transforms
+
 
 import cv2
 from src.datasets.base_dataset import BaseDataset, Sample
@@ -15,7 +15,7 @@ from typing_extensions import Self
 import os
 from PIL import Image
 
-from src.util.image_util import calculate_rgb_mean_std
+from src.util.polyp_transform import get_polyp_transform
 
 
 @dataclass
@@ -29,34 +29,6 @@ class RefugeFileReference:
     img_path: str
     gt_path: str
     split: str
-
-
-def get_polyp_transform():
-    transform_train = transforms.Compose(
-        [
-            # transforms.Resize((352, 352)),
-            transforms.ToPILImage(),
-            transforms.ColorJitter(
-                brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1  # type: ignore
-            ),
-            transforms.RandomVerticalFlip(),
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomAffine(90, scale=(0.75, 1.25)),
-            transforms.ToTensor(),
-            # transforms.Normalize([105.61, 63.69, 45.67],
-            #                      [83.08, 55.86, 42.59])
-        ]
-    )
-    transform_test = transforms.Compose(
-        [
-            # transforms.Resize((352, 352)),
-            transforms.ToPILImage(),
-            transforms.ToTensor(),
-            # transforms.Normalize([105.61, 63.69, 45.67],
-            #                      [83.08, 55.86, 42.59])
-        ]
-    )
-    return transform_train, transform_test
 
 
 class RefugeDatasetArgs(BaseModel):
@@ -76,9 +48,9 @@ class RefugeDataset(BaseDataset):
         self.yaml_config = yaml_config
         self.config = config
         self.samples = self.load_data() if samples is None else samples
-        pixel_mean, pixel_std = calculate_rgb_mean_std(
-            [s.img_path for s in self.samples],
-            os.path.join(yaml_config.cache_dir, "refuge_mean_std.pkl"),
+        pixel_mean, pixel_std = (
+            self.yaml_config.fundus_pixel_mean,
+            self.yaml_config.fundus_pixel_std,
         )
         self.sam_trans = ResizeLongestSide(
             image_enc_img_size, pixel_mean=pixel_mean, pixel_std=pixel_std
@@ -178,7 +150,7 @@ class RefugeDataset(BaseDataset):
                 ),
             )
             for subdir in os.listdir(dir)
-            if re.search("\d\d\d\d", subdir) is not None
+            if re.search("\d\d\d\d", subdir) is not None  # type: ignore
         ]
 
         return [
