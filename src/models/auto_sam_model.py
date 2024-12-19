@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Literal, Optional
 
 import torch
+from src.models.segment_anything.modeling.sam import SamBatched
 from src.args.yaml_config import YamlConfig
 from src.util.polyp_transform import get_polyp_transform
 from src.models.segment_anything.build_sam import (
@@ -272,9 +273,11 @@ def norm_batch(x):
     return x
 
 
-def sam_call(batched_input, sam, dense_embeddings, image_encoder_no_grad=True):
+def sam_call(
+    batched_input, sam: SamBatched, dense_embeddings, image_encoder_no_grad=True
+):
     with torch.set_grad_enabled(not image_encoder_no_grad):
-        input_images = torch.stack([sam.preprocess(x) for x in batched_input], dim=0)
+        input_images = batched_input
         image_embeddings = sam.image_encoder(input_images)
         sparse_embeddings_none, dense_embeddings_none = sam.prompt_encoder(
             points=None, boxes=None, masks=None
