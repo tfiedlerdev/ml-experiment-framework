@@ -94,13 +94,7 @@ class BaseExperiment(metaclass=ABCMeta):
 
         os.makedirs(self.results_dir, exist_ok=True)
         with open(os.path.join(self.results_dir, "config.json"), "w") as f:
-            config_copy: dict = {"args": dict(config)}
-            commit_hash, commit_url = get_git_info()
-            config_copy["git_commit_hash"] = commit_hash
-            config_copy["git_commit_url"] = commit_url
-            config_copy["repro_cmd"] = "python " + " ".join(sys.argv)
-            config_copy["yaml_config"] = yaml_config.model_dump()
-            json.dump(config_copy, f, indent=5)
+            json.dump(self._get_config_for_logging(), f, indent=5)
         self.model = self._create_model().to(self.get_device())
         self.checkpoint_history = None
         if self.base_config.from_checkpoint is not None:
@@ -117,6 +111,15 @@ class BaseExperiment(metaclass=ABCMeta):
 
             print("")
 
+    def _get_config_for_logging(self):
+        config_copy: dict = {"args": dict(self.raw_config)}
+        commit_hash, commit_url = get_git_info()
+        config_copy["git_commit_hash"] = commit_hash
+        config_copy["git_commit_url"] = commit_url
+        config_copy["repro_cmd"] = "python " + " ".join(sys.argv)
+        config_copy["yaml_config"] = self.yaml_config.model_dump()
+        return config_copy
+
     def _create_trainer(self):
         from src.train.trainer import Trainer
 
@@ -130,7 +133,7 @@ class BaseExperiment(metaclass=ABCMeta):
         wandb.init(
             project=self.yaml_config.wandb_project_name,
             entity=self.yaml_config.wandb_entity,
-            config=self.raw_config,
+            config=self._get_config_for_logging(),
             name=self.base_config.wandb_experiment_name,
             dir=self.yaml_config.cache_dir,
             save_code=True,
