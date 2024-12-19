@@ -72,6 +72,7 @@ def _build_sam(
     vit_patch_size = 16
 
     custom_img_size = YamlConfig().config.fundus_resize_img_size
+    is_custom_size = custom_img_size != image_size
     image_embedding_size = custom_img_size // vit_patch_size
     sam = SamBatched(
         image_encoder=ImageEncoderViT(
@@ -106,7 +107,7 @@ def _build_sam(
             transformer_dim=prompt_embed_dim,
             iou_head_depth=3,
             iou_head_hidden_dim=256,
-            custom_img_size=True,
+            custom_img_size=is_custom_size,
         ),
         pixel_mean=[123.675, 116.28, 103.53],
         pixel_std=[58.395, 57.12, 57.375],
@@ -116,6 +117,6 @@ def _build_sam(
         with open(checkpoint, "rb") as f:
             state_dict = torch.load(f)
         sam.load_state_dict(state_dict)
-
-    sam.image_encoder.scale_pos_embed(custom_img_size)
+    if is_custom_size:
+        sam.image_encoder.scale_pos_embed(custom_img_size)
     return sam
